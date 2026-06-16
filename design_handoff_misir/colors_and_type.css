@@ -1,0 +1,257 @@
+/* ============================================================
+   MISIR — Colors & Type
+   Swiss-typographic, minimal, information-first.
+   Orange is signal. Gray is structure. White is space.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ---------- BRAND COLOR ---------- */
+  /* Orange is the only accent. Use as signal, never as wallpaper. */
+  --brand-orange:        #FF6C3C;   /* Misir signal orange */
+  --brand-orange-hover:  #F25C2A;
+  --brand-orange-press:  #DC4D1C;
+  --brand-orange-soft:   #FFE8DF;   /* subtle wash for highlights */
+  --brand-orange-tint:   #FFF4EE;   /* extra-soft surface */
+
+  /* ---------- NEUTRAL SCALE (warm gray) ---------- */
+  /* Slightly warm grays — pair quietly with the orange accent. */
+  --gray-0:   #FFFFFF;
+  --gray-25:  #FAFAF9;
+  --gray-50:  #F5F4F2;
+  --gray-100: #ECEAE6;
+  --gray-150: #E0DDD8;
+  --gray-200: #D4D0CA;
+  --gray-300: #B8B3AC;
+  --gray-400: #908A82;
+  --gray-500: #6E6862;
+  --gray-600: #4F4A45;
+  --gray-700: #36322E;
+  --gray-800: #211E1B;
+  --gray-900: #141210;
+
+  /* ---------- SEMANTIC TOKENS — LIGHT (default) ---------- */
+  --bg:           var(--gray-0);          /* canvas */
+  --bg-subtle:    var(--gray-25);         /* sidebar / off-canvas */
+  --bg-muted:     var(--gray-50);         /* cards, code blocks */
+  --bg-inset:     var(--gray-100);        /* inset wells */
+  --bg-hover:     rgba(20, 18, 16, 0.04);
+  --bg-active:    rgba(20, 18, 16, 0.06);
+
+  --fg:           var(--gray-900);        /* primary text */
+  --fg-muted:     var(--gray-600);        /* secondary text */
+  --fg-subtle:    var(--gray-400);        /* tertiary / metadata */
+  --fg-faint:     var(--gray-300);        /* placeholder / disabled */
+  --fg-on-accent: #FFFFFF;
+
+  --border:        var(--gray-100);
+  --border-strong: var(--gray-200);
+  --border-focus:  var(--brand-orange);
+
+  --accent:        var(--brand-orange);
+  --accent-hover:  var(--brand-orange-hover);
+  --accent-press:  var(--brand-orange-press);
+  --accent-soft:   var(--brand-orange-soft);
+
+  /* Status — used sparingly, never as the primary signal */
+  --success: #2E7D55;
+  --warning: #B8730D;
+  --danger:  #C0392B;
+  --info:    var(--brand-orange);
+
+  /* ---------- TYPOGRAPHY ---------- */
+  /* System: Inter for UI/body, Inter Tight for display tightening,
+     JetBrains Mono for data, code, and timestamps. */
+  --font-sans:    "Inter", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-display: "Inter Tight", "Inter", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono:    "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Type scale — 4pt baseline, tight Swiss rhythm */
+  --text-2xs:  11px;
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;   /* product UI default */
+  --text-md:   15px;   /* reading default */
+  --text-lg:   17px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  32px;
+  --text-4xl:  44px;
+  --text-5xl:  60px;
+  --text-6xl:  84px;
+
+  --leading-tight:   1.12;
+  --leading-snug:    1.28;
+  --leading-normal:  1.45;
+  --leading-relaxed: 1.6;
+
+  --tracking-tight:  -0.02em;
+  --tracking-snug:   -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-caps:   0.08em;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semi:    600;
+  --weight-bold:    700;
+
+  /* ---------- SPACING (4px base) ---------- */
+  --space-0:   0;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+
+  /* ---------- RADII ---------- */
+  /* Misir is restrained — small radii, never pillowy. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* ---------- SHADOWS / ELEVATION ---------- */
+  /* No drop shadows for chrome. Reserved for floating menus. */
+  --shadow-none: none;
+  --shadow-sm:   0 1px 2px rgba(20, 18, 16, 0.04);
+  --shadow-md:   0 4px 12px rgba(20, 18, 16, 0.06), 0 1px 2px rgba(20, 18, 16, 0.04);
+  --shadow-lg:   0 12px 32px rgba(20, 18, 16, 0.10), 0 2px 6px rgba(20, 18, 16, 0.04);
+  --shadow-pop:  0 18px 48px rgba(20, 18, 16, 0.14);
+
+  /* ---------- MOTION ---------- */
+  --ease-out:   cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+
+  /* ---------- LAYOUT ---------- */
+  --container-narrow: 720px;
+  --container-prose:  920px;
+  --container-wide:   1200px;
+  --container-max:    1440px;
+
+  --sidebar-w: 248px;
+  --topbar-h:  48px;
+}
+
+/* ---------- DARK ---------- */
+[data-theme="dark"] {
+  --bg:           #0E0D0B;
+  --bg-subtle:    #141210;
+  --bg-muted:     #1B1916;
+  --bg-inset:     #221F1B;
+  --bg-hover:     rgba(255,255,255,0.04);
+  --bg-active:    rgba(255,255,255,0.06);
+
+  --fg:           #F5F4F2;
+  --fg-muted:     #B8B3AC;
+  --fg-subtle:    #6E6862;
+  --fg-faint:     #4F4A45;
+
+  --border:        #211E1B;
+  --border-strong: #36322E;
+
+  --accent-soft:   rgba(252, 111, 63, 0.14);
+  --shadow-md:   0 4px 12px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-lg:   0 12px 32px rgba(0,0,0,0.6);
+}
+
+/* ============================================================
+   Semantic element styles — load with this stylesheet to get
+   defaults that match the system.
+   ============================================================ */
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, .h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semi);
+  margin: 0;
+}
+h2, .h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  font-weight: var(--weight-semi);
+  margin: 0;
+}
+h3, .h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  font-weight: var(--weight-semi);
+  margin: 0;
+}
+h4, .h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-semi);
+  margin: 0;
+}
+p {
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--fg);
+  margin: 0;
+}
+small, .caption {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  letter-spacing: var(--tracking-normal);
+}
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+code, kbd, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) var(--ease-out);
+}
+a:hover { text-decoration-color: var(--accent); }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-6) 0;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
+}

@@ -1,0 +1,336 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Icon } from "@/components/misir/primitives/Icon"
+import {
+  Card,
+  SectionHead,
+} from "@/components/misir/primitives/Card"
+import {
+  FilterBar,
+  FilterCount,
+  Segmented,
+  type SegmentOption,
+} from "@/components/misir/primitives/FilterBar"
+import { Chip } from "@/components/misir/primitives/Chip"
+import { SubspaceTag, SpaceTag } from "@/components/misir/primitives/Tag"
+import { useArtifacts } from "@/lib/hooks/useArtifacts"
+import { useSpaces } from "@/lib/hooks/useSpaces"
+import { useSubspaces } from "@/lib/hooks/useSubspaces"
+import { adaptCaptures, type CaptureVM } from "@/lib/api/capture-adapters"
+import { getSpaceColor } from "@/lib/constants/space-colors"
+import { getSubspaceColor } from "@/lib/constants/subspace-colors"
+import type { PlatformType, ReportPeriod, Space, Subspace } from "@/lib/api/types"
+
+type Scope = "all" | number
+
+type TypeKey = "all" | "article" | "aichat" | "pdf" | "video" | "post"
+
+const TYPE_LABEL: Record<TypeKey, string> = {
+  all: "All",
+  article: "Articles",
+  aichat: "AI chats",
+  pdf: "PDFs",
+  video: "Videos",
+  post: "Posts",
+}
+
+/**
+ * Map a capture's design "type" back to the same TypeKey we filter on.
+ * Mirrors the inverse of `captureType()` in surface-icons.ts.
+ */
+function classifyCapture(c: CaptureVM): Exclude<TypeKey, "all"> {
+  switch (c.type) {
+    case "AI chat":
+      return "aichat"
+    case "PDF":
+      return "pdf"
+    case "Video":
+      return "video"
+    case "Post":
+      return "post"
+    default:
+      return "article"
+  }
+}
+
+/** Debounce a string value by `delayMs`. Preserves focus on input fields. */
+function useDebounced<T>(value: T, delayMs = 200): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(id)
+  }, [value, delayMs])
+  return debounced
+}
+
+export function CollectionView({ scope }: { scope: Scope }) {
+  const search = useSearchParams()
+  const router = useRouter()
+  const isAll = scope === "all"
+  const period = (search.get("period") ?? "week") as ReportPeriod
+
+  const { data: spaces = [] } = useSpaces()
+
+  const [typeFilter, setTypeFilter] = useState<TypeKey>("all")
+  const [spaceFilter, setSpaceFilter] = useState<string>(
+    isAll ? "all" : String(scope),
+  )
+  const [subFilter, setSubFilter] = useState<string>(
+    search.get("sub") ?? "all",
+  )
+  const [query, setQuery] = useState<string>(search.get("q") ?? "")
+  const debouncedQ = useDebounced(query, 200)
+
+  // Honor `?sub=` deep-link from MisirAsks/SubspaceStatusList navigation.
+  useEffect(() => {
+    const fromUrl = search.get("sub")
+    if (fromUrl && fromUrl !== subFilter) setSubFilter(fromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  const effectiveSpaceId =
+    isAll && spaceFilter !== "all"
+      ? Number(spaceFilter)
+      : !isAll
+        ? (scope as number)
+        : undefined
+
+  // Subspaces picker is populated from whichever single space is in scope.
+  const subspaces = useSubspaces(effectiveSpaceId ?? null)
+
+  const artifacts = useArtifacts({
+    spaceId: effectiveSpaceId,
+    period,
+    q: debouncedQ.trim() || undefined,
+    limit: 200,
+  })
+
+  const captures = useMemo(
+    () => adaptCaptures(artifacts.data ?? []),
+    [artifacts.data],
+  )
+
+  // Counts per type (over the unfiltered fetched set so the segment labels
+  // don't shrink to 0 as the user clicks).
+  const typeCounts: Record<TypeKey, number> = useMemo(() => {
+    const c: Record<TypeKey, number> = {
+      all: captures.length,
+      article: 0,
+      aichat: 0,
+      pdf: 0,
+      video: 0,
+      post: 0,
+    }
+    for (const cap of captures) c[classifyCapture(cap)]++
+    return c
+  }, [captures])
+
+  const filtered = useMemo(
+    () =>
+      captures
+        .filter((c) =>
+          typeFilter === "all" ? true : classifyCapture(c) === typeFilter,
+        )
+        .filter((c) =>
+          subFilter === "all"
+            ? true
+            : String(c.subspaceId ?? "—") === subFilter,
+        ),
+    [captures, typeFilter, subFilter],
+  )
+
+  // Group by date label ("Today", "Yesterday", "2d ago", "Aug 14"…)
+  const groups: Array<[string, CaptureVM[]]> = useMemo(() => {
+    const map = new Map<string, CaptureVM[]>()
+    for (const c of filtered) {
+      const list = map.get(c.date) ?? []
+      list.push(c)
+      map.set(c.date, list)
+    }
+    return Array.from(map.entries())
+  }, [filtered])
+
+  const segOpts: SegmentOption<TypeKey>[] = (Object.keys(TYPE_LABEL) as TypeKey[]).map(
+    (k) => ({ value: k, label: TYPE_LABEL[k], count: typeCounts[k] }),
+  )
+
+  return (
+    <>
+      <SectionHead
+        title="Collection"
+        small="Everything the extension captured"
+        right={
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+            {captures.length} total
+          </span>
+        }
+      />
+
+      <Card className="p-0 overflow-hidden">
+        <FilterBar>
+          <Segmented value={typeFilter} onChange={setTypeFilter} options={segOpts} />
+
+          {isAll && spaces.length > 0 && (
+            <select
+              value={spaceFilter}
+              onChange={(e) => {
+                setSpaceFilter(e.target.value)
+                setSubFilter("all")
+              }}
+              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-accent"
+            >
+              <option value="all">All spaces</option>
+              {spaces.map((s) => (
+                <option key={s.id} value={String(s.id)}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(!isAll || spaceFilter !== "all") && (
+            <select
+              value={subFilter}
+              onChange={(e) => {
+                setSubFilter(e.target.value)
+                const sp = new URLSearchParams(search.toString())
+                if (e.target.value === "all") sp.delete("sub")
+                else sp.set("sub", e.target.value)
+                const qs = sp.toString()
+                router.replace(qs ? `?${qs}` : "?")
+              }}
+              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-accent"
+            >
+              <option value="all">All subspaces</option>
+              {(subspaces.data ?? []).map((s) => (
+                <option key={s.id} value={String(s.id)}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <input
+            type="text"
+            placeholder="Search title, marker, source…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-7 min-w-[200px] rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none placeholder:text-fg-faint focus:outline-2 focus:outline-accent focus:-outline-offset-1"
+          />
+          <FilterCount>
+            {filtered.length} of {captures.length}
+          </FilterCount>
+        </FilterBar>
+
+        {filtered.length === 0 ? (
+          <div className="px-6 py-8 text-center text-[13px] text-fg-subtle">
+            {captures.length === 0
+              ? "No captures yet. Install the extension to start capturing."
+              : "No captures match."}
+          </div>
+        ) : (
+          groups.map(([date, items]) => (
+            <DateGroup
+              key={date}
+              date={date}
+              items={items}
+              spaces={spaces}
+              subspaces={subspaces.data ?? []}
+              isAll={isAll}
+            />
+          ))
+        )}
+      </Card>
+    </>
+  )
+}
+
+function DateGroup({
+  date,
+  items,
+  spaces,
+  subspaces,
+  isAll,
+}: {
+  date: string
+  items: CaptureVM[]
+  spaces: Space[]
+  subspaces: Subspace[]
+  isAll: boolean
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-1.5 border-b border-border bg-bg-subtle px-[18px] py-2.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+        {date}
+        <span className="text-fg-faint">{items.length}</span>
+      </div>
+      {items.map((c) => (
+        <CaptureRow
+          key={c.id}
+          capture={c}
+          subspace={
+            c.subspaceId != null
+              ? subspaces.find((s) => s.id === c.subspaceId) ?? null
+              : null
+          }
+          space={
+            isAll && c.spaceId != null
+              ? spaces.find((s) => s.id === c.spaceId) ?? null
+              : null
+          }
+          isAll={isAll}
+        />
+      ))}
+    </>
+  )
+}
+
+function CaptureRow({
+  capture,
+  subspace,
+  space,
+  isAll,
+}: {
+  capture: CaptureVM
+  subspace: Subspace | null
+  space: Space | null
+  isAll: boolean
+}) {
+  const subspaceColor = subspace ? getSubspaceColor(subspace) : undefined
+  const spaceColor = space ? getSpaceColor(space) : undefined
+
+  return (
+    <div
+      className="grid items-center gap-3.5 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
+      style={{ gridTemplateColumns: "60px 110px 1fr auto" }}
+    >
+      <div className="whitespace-nowrap font-mono text-[10.5px] text-fg-subtle">
+        {capture.time}
+      </div>
+      <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-fg-muted mobile:hidden">
+        <Icon name={capture.surfaceIcon} size={12} />
+        {capture.surface}
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <Chip variant="type">{capture.type.toLowerCase()}</Chip>
+        <span className="min-w-0 flex-1 truncate text-[13px] text-fg">
+          {capture.title}
+        </span>
+        {capture.revisit && (
+          <Chip variant="revisit">×{capture.revisit} revisited</Chip>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        {capture.marker && <Chip variant="marker">{capture.marker}</Chip>}
+        {subspace && (
+          <SubspaceTag color={subspaceColor}>{subspace.name}</SubspaceTag>
+        )}
+        {isAll && space && (
+          <SpaceTag color={spaceColor}>{space.name}</SpaceTag>
+        )}
+      </div>
+    </div>
+  )
+}

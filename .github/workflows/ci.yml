@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Dummy values so Settings loads + the app builds; tests mock real services.
+      SUPABASE_URL: https://dummy.supabase.co
+      SUPABASE_SERVICE_KEY: dummy-service-key
+      CLERK_JWKS_URL: https://dummy.clerk.accounts.dev/.well-known/jwks.json
+      RATE_LIMIT_STORAGE: memory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+
+  frontend:
+    name: Frontend (lint + typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+  extension:
+    name: Extension (typecheck + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extention
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # No committed lockfile yet (see R10) — use install, not ci.
+      - run: npm install
+      - run: npx tsc --noEmit
+      - run: npx vitest run

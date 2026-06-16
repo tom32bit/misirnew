@@ -1,0 +1,39 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.18
+
+# Auth
+python-jose[cryptography]==3.3.0
+httpx==0.27.2
+
+# Supabase
+supabase==2.10.0
+
+# Config
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# LLM
+groq==0.13.1
+
+# Embeddings (optional — comment out if not running locally)
+sentence-transformers==3.3.1
+numpy==2.2.1
+
+# Rate limiting
+slowapi==0.1.9
+# Shared cross-instance storage for rate limiting + Groq quota (optional;
+# only used when RATE_LIMIT_STORAGE=redis). Enables safe horizontal scaling.
+redis==5.2.1
+
+# Logging
+structlog==24.4.0
+
+# Error types
+result==0.17.0
+
+# Dev / testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.27.2

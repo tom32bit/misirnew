@@ -1,0 +1,52 @@
+# ─── Secrets — defense in depth (sub-projects also gitignore these) ──────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ─── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+.npm/
+package-lock.json.bak
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ─── Next.js ──────────────────────────────────────────────────────────────────
+.next/
+out/
+.vercel/
+.netlify/
+next-env.d.ts
+*.tsbuildinfo
+
+# ─── Vite / extension build ───────────────────────────────────────────────────
+dist/
+dist-prod/
+.cache/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── IDE / OS ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+.turbo/
+.claude/
+*.tmp

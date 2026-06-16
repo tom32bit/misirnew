@@ -1,0 +1,4 @@
+web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Required ONLY when JOB_QUEUE_ENABLED=true — processes the post-capture
+# embedding/synthesis queue. Without it, enqueued jobs pile up unprocessed.
+worker: python -m infrastructure.jobs.worker
