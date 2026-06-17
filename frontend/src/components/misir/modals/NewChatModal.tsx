@@ -77,7 +77,9 @@ export function NewChatModal({
     }
   }
 
-  const usePrompt = (p: string) => {
+  // NOT a hook — named without the `use` prefix so eslint's rules-of-hooks
+  // doesn't misclassify it when called from the onClick handler below.
+  const applyPrompt = (p: string) => {
     setDraft(p)
     setTimeout(() => {
       const el = ta.current
@@ -160,7 +162,7 @@ export function NewChatModal({
                 <button
                   key={p}
                   type="button"
-                  onClick={() => usePrompt(p)}
+                  onClick={() => applyPrompt(p)}
                   className="flex cursor-pointer items-center gap-2 rounded-sm bg-transparent px-3 py-2 text-left text-[12.5px] leading-[1.45] text-fg hover:bg-bg-muted before:flex-none before:font-semibold before:text-accent before:content-['→']"
                 >
                   {p}

@@ -10,7 +10,7 @@ export default function DashboardNotFound() {
         Not here.
       </h2>
       <p className="mb-5 text-[13px] leading-[1.55] text-fg-muted">
-        The view or space you're looking for doesn't exist.
+        The view or space you&apos;re looking for doesn&apos;t exist.
       </p>
       <Link
         href="/dashboard"
