@@ -3,10 +3,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, ArrowRight } from "lucide-react"
+import Markdown from "react-markdown"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, SectionHead } from "@/components/misir/primitives/Card"
+import { Card } from "@/components/misir/primitives/Card"
 import { useMessages, useSendMessageStream } from "@/lib/hooks/useChat"
 import type { ChatMessage } from "@/lib/api/types"
 
@@ -46,17 +47,21 @@ export function ChatThread({ conversationId }: { conversationId: number }) {
   }
 
   return (
-    <div className="flex h-full max-h-[calc(100vh-52px-48px)] flex-col gap-3">
-      <SectionHead
-        title="Chat"
-        small={`Conversation #${conversationId}`}
-        right={
-          <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
-            <ArrowLeft size={12} />
-            Back
-          </Button>
-        }
-      />
+    <div className="flex h-[calc(100vh-52px-41px-24px-64px)] flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ArrowLeft size={12} />
+          Back
+        </Button>
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+          Chat
+        </span>
+        <span className="flex-1" />
+        <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/all/inbox")}>
+          Inbox
+          <ArrowRight size={12} />
+        </Button>
+      </div>
 
       <ScrollArea
         viewportRef={scrollRef}
@@ -122,6 +127,26 @@ export function ChatThread({ conversationId }: { conversationId: number }) {
   )
 }
 
+function MisirMarkdown({ content }: { content: string }) {
+  return (
+    <Markdown
+      components={{
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4 last:mb-0">{children}</ul>,
+        ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-4 last:mb-0">{children}</ol>,
+        li: ({ children }) => <li className="leading-[1.55]">{children}</li>,
+        strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
+        em: ({ children }) => <em className="italic">{children}</em>,
+        code: ({ children }) => (
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[12px]">{children}</code>
+        ),
+      }}
+    >
+      {content}
+    </Markdown>
+  )
+}
+
 function Bubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user"
   return (
@@ -142,7 +167,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
             : "bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-fg",
         ].join(" ")}
       >
-        {msg.content}
+        {isUser ? msg.content : <MisirMarkdown content={msg.content} />}
       </div>
     </div>
   )
@@ -155,17 +180,19 @@ function StreamingBubble({ partial }: { partial: string }) {
         Misir
       </span>
       <div className="rounded-lg border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] px-3.5 py-2.5 text-[13.5px] leading-[1.55] text-fg">
-        {partial || (
+        {partial ? (
+          <>
+            <MisirMarkdown content={partial} />
+            <span
+              className="ml-1 inline-block h-3 w-px translate-y-[1px] bg-accent"
+              style={{ animation: "pulse-dot 1s ease-in-out infinite" }}
+            />
+          </>
+        ) : (
           <span className="inline-flex items-center gap-1.5">
             <TypingDots />
             <span className="text-fg-muted">Misir is thinking…</span>
           </span>
-        )}
-        {partial && (
-          <span
-            className="ml-1 inline-block h-3 w-px translate-y-[1px] bg-accent"
-            style={{ animation: "pulse-dot 1s ease-in-out infinite" }}
-          />
         )}
       </div>
     </div>

@@ -15,7 +15,7 @@ import {
 } from "@/components/misir/primitives/FilterBar"
 import { Chip } from "@/components/misir/primitives/Chip"
 import { SubspaceTag, SpaceTag } from "@/components/misir/primitives/Tag"
-import { useArtifacts } from "@/lib/hooks/useArtifacts"
+import { useArtifacts, useDeleteArtifact } from "@/lib/hooks/useArtifacts"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useSubspaces } from "@/lib/hooks/useSubspaces"
 import { adaptCaptures, type CaptureVM } from "@/lib/api/capture-adapters"
@@ -100,12 +100,14 @@ export function CollectionView({ scope }: { scope: Scope }) {
   // Subspaces picker is populated from whichever single space is in scope.
   const subspaces = useSubspaces(effectiveSpaceId ?? null)
 
-  const artifacts = useArtifacts({
+  const artifactOpts = {
     spaceId: effectiveSpaceId,
     period,
     q: debouncedQ.trim() || undefined,
     limit: 200,
-  })
+  }
+  const artifacts = useArtifacts(artifactOpts)
+  const deleteArtifact = useDeleteArtifact(artifactOpts)
 
   const captures = useMemo(
     () => adaptCaptures(artifacts.data ?? []),
@@ -239,6 +241,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
               spaces={spaces}
               subspaces={subspaces.data ?? []}
               isAll={isAll}
+              onDelete={(id) => deleteArtifact.mutate(Number(id))}
             />
           ))
         )}
@@ -253,12 +256,14 @@ function DateGroup({
   spaces,
   subspaces,
   isAll,
+  onDelete,
 }: {
   date: string
   items: CaptureVM[]
   spaces: Space[]
   subspaces: Subspace[]
   isAll: boolean
+  onDelete: (id: string) => void
 }) {
   return (
     <>
@@ -281,6 +286,7 @@ function DateGroup({
               : null
           }
           isAll={isAll}
+          onDelete={onDelete}
         />
       ))}
     </>
@@ -292,19 +298,22 @@ function CaptureRow({
   subspace,
   space,
   isAll,
+  onDelete,
 }: {
   capture: CaptureVM
   subspace: Subspace | null
   space: Space | null
   isAll: boolean
+  onDelete: (id: string) => void
 }) {
+  const [confirming, setConfirming] = useState(false)
   const subspaceColor = subspace ? getSubspaceColor(subspace) : undefined
   const spaceColor = space ? getSpaceColor(space) : undefined
 
   return (
     <div
-      className="grid items-center gap-3.5 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
-      style={{ gridTemplateColumns: "60px 110px 1fr auto" }}
+      className="group grid items-center gap-3.5 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
+      style={{ gridTemplateColumns: "60px 110px 1fr auto auto" }}
     >
       <div className="whitespace-nowrap font-mono text-[10.5px] text-fg-subtle">
         {capture.time}
@@ -329,6 +338,32 @@ function CaptureRow({
         )}
         {isAll && space && (
           <SpaceTag color={spaceColor}>{space.name}</SpaceTag>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        {confirming ? (
+          <>
+            <button
+              onClick={() => { onDelete(capture.id); setConfirming(false) }}
+              className="rounded px-2 py-0.5 text-[11px] font-medium text-white bg-red-500 hover:bg-red-600"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="rounded px-2 py-0.5 text-[11px] text-fg-muted hover:text-fg"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint hover:text-red-500 transition-opacity"
+            aria-label="Delete capture"
+          >
+            <Icon name="trash-2" size={13} />
+          </button>
         )}
       </div>
     </div>
