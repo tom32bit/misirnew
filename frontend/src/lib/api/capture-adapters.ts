@@ -6,6 +6,7 @@
 import type {
   Artifact,
   DashboardPayload,
+  DashboardSubspaceStat,
   Subspace,
 } from "./types"
 import {
@@ -132,14 +133,23 @@ export function adaptSubspaces(
   subs: Subspace[],
   artifacts: Artifact[],
   depth?: DashboardPayload["research_depth"],
+  stats?: DashboardSubspaceStat[],
   now = new Date(),
 ): SubspaceVM[] {
   const nowMs = now.getTime()
   const weekMs = 7 * 24 * 60 * 60 * 1000
+  const statById = new Map<number, DashboardSubspaceStat>()
+  for (const st of stats ?? []) statById.set(st.id, st)
 
   return subs.map((s) => {
-    // We don't have a backend join from artifact → subspace today; use
-    // metadata.subspace_id when present, else attribute nothing.
+    // Real attribution comes from the backend, which joins artifact markers to
+    // each subspace's markers. Captures carry no subspace_id, so we trust the
+    // backend stat when present and only fall back to a local estimate otherwise.
+    const stat = statById.get(s.id)
+
+    // Local fallback attribution (only used if the backend sent no stats):
+    // intersect the artifact's matched markers — which we don't have a subspace
+    // map for here — so this degrades to "no local attribution".
     const owned = artifacts.filter((a) => {
       const meta = (a.metadata ?? {}) as Record<string, unknown>
       return typeof meta.subspace_id === "number" && meta.subspace_id === s.id
@@ -156,12 +166,11 @@ export function adaptSubspaces(
       return nowMs - t > weekMs && nowMs - t <= 2 * weekMs
     }).length
 
-    // Prefer backend's research_depth row if it exists for this subspace name.
-    const depthHit = depth?.find((d) => d.label === s.name)
-    const completeness =
-      depthHit?.pct != null
-        ? Math.max(0, Math.min(100, Math.round(depthHit.pct)))
-        : Math.max(0, Math.min(100, owned.length * 10))
+    const captures = stat?.captures ?? owned.length
+    const completeness = Math.max(
+      0,
+      Math.min(100, stat?.completeness ?? owned.length * 10),
+    )
 
     const flag: SubspaceVM["flag"] =
       completeness < 25
@@ -170,17 +179,20 @@ export function adaptSubspaces(
           ? "low"
           : undefined
 
+    const lastHit = stat?.last_captured_at
+      ? relTime(stat.last_captured_at, nowMs)
+      : capturedAts.length > 0
+        ? relTime(new Date(capturedAts[0]).toISOString(), nowMs)
+        : "—"
+
     return {
       id: s.id,
       name: s.name,
       description: s.description,
-      captures: owned.length,
+      captures,
       weekDelta: last7 - prior7,
       completeness,
-      lastHit:
-        capturedAts.length > 0
-          ? relTime(new Date(capturedAts[0]).toISOString(), nowMs)
-          : "—",
+      lastHit,
       flag,
       flagNote:
         flag === "critical"

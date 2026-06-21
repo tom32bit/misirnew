@@ -93,7 +93,10 @@ async def synthesize_artifact_text(artifact_id: int, text: str, space_context: O
         messages[1]["content"] = f"Space goal: {space_context}\n\n" + messages[1]["content"]
 
     try:
-        resp = await groq.chat_completion(messages, max_tokens=512, temperature=0.3, priority=TaskPriority.SYNTHESIS)
+        resp = await groq.chat_completion(
+            messages, max_tokens=512, temperature=0.3, priority=TaskPriority.SYNTHESIS,
+            extra={"response_format": {"type": "json_object"}},
+        )
         raw = resp.choices[0].message.content.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
@@ -237,7 +240,10 @@ space_id: {space_id}"""
     payload = None
     for attempt in range(2):
         try:
-            resp = await groq.chat_completion(messages, max_tokens=1024, temperature=0.3, priority=TaskPriority.SYNTHESIS)
+            resp = await groq.chat_completion(
+                messages, max_tokens=1024, temperature=0.3, priority=TaskPriority.SYNTHESIS,
+                extra={"response_format": {"type": "json_object"}},
+            )
             raw = resp.choices[0].message.content.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]

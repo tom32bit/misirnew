@@ -49,6 +49,7 @@ Rules:
 - headline should reference the most urgent finding.
 - If a deadline exists, open headline with "{days} days to {label}.".
 - Maximum 3 points. Mark accent=true on the single most urgent point.
+- Plain text only — do NOT use markdown (no **, *, _, #, backticks). Labels are already styled by the UI.
 - Do NOT output any percentages, ratios, or numbers."""
 
 COMPARISON_SYSTEM = """\
@@ -72,23 +73,28 @@ Rules:
 
 DECISION_SYSTEM = """\
 You are Misir, a research assistant. Based on the user's space goal and open knowledge gaps,
-derive two meaningful research strategy options and write pros/cons for each.
+frame the single strategic decision this space is trying to answer, derive two meaningful
+research strategy options with pros/cons, and suggest one follow-up question Misir could ask.
 Respond in JSON:
 {
+  "question": "<the single strategic decision this space is trying to answer, phrased as a question ending in '?'>",
   "option_a": {
     "label": "<action-oriented label — 3-5 words specific to the domain>",
+    "note": "<3-5 word qualifier for this option, e.g. 'Critical gaps remain'>",
     "pros": ["<string>", ...],
     "cons": ["<string>", ...]
   },
   "option_b": {
     "label": "<action-oriented label — 3-5 words specific to the domain>",
+    "note": "<3-5 word qualifier for this option>",
     "pros": ["<string>", ...],
     "cons": ["<string>", ...]
-  }
+  },
+  "ask": "<a short first-person question Misir can ask the user to move this decision forward, ending in '?'>"
 }
 Rules:
-- Derive the two options from the space goal and open gaps (e.g. "Go Deep on Fundamentals" vs "Explore Applications").
-- Labels must be specific to the research domain — never use generic startup language like "Raise Series A" or "Extend Runway".
+- Derive everything from the space goal and open gaps (e.g. "Go Deep on Fundamentals" vs "Explore Applications").
+- The question and labels must be specific to the research domain — never use generic startup language like "Raise Series A" or "Extend Runway" unless the goal is literally about that.
 - Maximum 4 pros and 4 cons per option.
 - If requires_deadline=false, do NOT reference specific timing or deadlines.
 - Do NOT output any percentages or numbers."""
@@ -158,7 +164,7 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db) ->
     arts_row = await aexec(
         db.schema("misir")
         .table("artifact")
-        .select("id, title, platform, engagement_level, base_weight, captured_at, content_hash, extracted_text, content_source, word_count")
+        .select("id, title, platform, engagement_level, base_weight, captured_at, content_hash, extracted_text, content_source, word_count, matched_marker_ids")
         .eq("space_id", space_id)
         .gte("captured_at", since.isoformat())
     )
@@ -453,12 +459,81 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db) ->
         .limit(3)
     )
 
+    # ── Per-subspace stats ────────────────────────────────────────────────────
+    # The artifact→subspace link is via shared markers: an artifact belongs to a
+    # subspace when its matched_marker_ids intersect that subspace's markers
+    # (subspace_marker). Captures carry no subspace_id, so this join is the only
+    # real attribution available. Without it every subspace reads 0 captures / 0%.
+    subspace_stats = []
+    subs_row = await aexec(
+        db.schema("misir").table("subspace").select("id, name, description").eq("space_id", space_id)
+    )
+    subspaces = subs_row.data or []
+    if subspaces:
+        sub_ids = [s["id"] for s in subspaces]
+        sm_row = await aexec(
+            db.schema("misir").table("subspace_marker").select("subspace_id, marker_id").in_("subspace_id", sub_ids)
+        )
+        markers_by_sub: dict[int, set] = {}
+        for r in (sm_row.data or []):
+            markers_by_sub.setdefault(r["subspace_id"], set()).add(r["marker_id"])
+
+        # Attribute a capture to every subspace it SUBSTANTIALLY supports, not
+        # every subspace it merely grazes. Matched-marker sets are broad (one
+        # artifact can touch all subspaces), so a plain "any overlap" count made
+        # every subspace identical; a single best-match made all but one empty.
+        # Relevance score = |artifact markers ∩ subspace markers| / |subspace
+        # markers| (a subspace with more markers isn't unfairly favoured); a
+        # capture counts for the subspace when it matched at least half its
+        # markers. This mirrors tagging: a pre-seed explainer legitimately informs
+        # several topics, while a topic with no supporting material stays low —
+        # real signal, not a bug.
+        SUBSPACE_RELEVANCE_THRESHOLD = 0.5
+        owned_by_sub: dict[int, list] = {s["id"]: [] for s in subspaces}
+        for a in artifacts:
+            amarkers = set(a.get("matched_marker_ids") or [])
+            if not amarkers:
+                continue
+            for s in subspaces:
+                sset = markers_by_sub.get(s["id"], set())
+                if not sset:
+                    continue
+                if len(amarkers & sset) / len(sset) >= SUBSPACE_RELEVANCE_THRESHOLD:
+                    owned_by_sub[s["id"]].append(a)
+
+        from domain.entities.common import EngagementLevel as _EL2
+        for s in subspaces:
+            owned = owned_by_sub.get(s["id"], [])
+            if owned:
+                eng_mults = []
+                for a in owned:
+                    try:
+                        eng_mults.append(_EL2(a["engagement_level"]).multiplier)
+                    except Exception:
+                        eng_mults.append(0.5)
+                avg_eng = sum(eng_mults) / len(eng_mults)
+                pct = round(
+                    compute_research_depth_pct(len(owned), avg_eng, settings.RESEARCH_DEPTH_TARGET) * 100
+                )
+                last_at = max(a["captured_at"] for a in owned)
+            else:
+                pct = 0
+                last_at = None
+            subspace_stats.append({
+                "id": s["id"],
+                "name": s["name"],
+                "captures": len(owned),
+                "completeness": pct,
+                "last_captured_at": last_at,
+            })
+
     return {
         "misirs_read": {
             **(misirs_read or {}),
             "coverage": readiness,
             "gaps": len([g for g in gaps if g["status"] == "open"]),
         },
+        "subspaces": subspace_stats,
         "sources": sources,
         "synthesis": {**(comparison.get("synthesis") or {}), "readiness": readiness} if comparison else None,
         "key_tension": comparison.get("key_tension") if comparison else None,
@@ -492,6 +567,27 @@ async def _get_or_build_report(user_id, space_id, kind, period, source_hash, db,
     return result
 
 
+def _parse_json_object(raw: str) -> dict:
+    """Parse a JSON object from an LLM response. The structured builds request
+    Groq JSON mode (response_format=json_object), so content is normally clean
+    JSON — but stay defensive: strip code fences and fall back to the first
+    {...} block so a stray prefix (e.g. "Here is the response …") can't null the
+    whole build, which previously made the dashboard fall back to placeholders."""
+    import re
+    s = (raw or "").strip()
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", s, re.DOTALL)
+    if fenced:
+        return json.loads(fenced.group(1))
+    bare = re.search(r"\{.*\}", s, re.DOTALL)
+    if bare:
+        return json.loads(bare.group(0))
+    raise ValueError("no JSON object in LLM response")
+
+
 async def _build_misir_read(space, stage_a, deadline, readiness, gap_count) -> Optional[dict]:
     groq = get_groq_client()
     if not groq.is_available or not stage_a:
@@ -514,13 +610,9 @@ patterns: {json.dumps(stage_a.get('patterns', [])[:3])}"""
         resp = await groq.chat_completion(
             [{"role": "system", "content": MISIR_READ_SYSTEM}, {"role": "user", "content": user_prompt}],
             max_tokens=400, temperature=0.3, priority=TaskPriority.SYNTHESIS,
+            extra={"response_format": {"type": "json_object"}},
         )
-        raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return json.loads(raw)
+        return _parse_json_object(resp.choices[0].message.content)
     except Exception as exc:
         logger.error("Misir's Read build failed", error=str(exc))
         return {"headline": stage_a.get("headline", "Research in progress."), "points": []}
@@ -553,13 +645,9 @@ Stage A open questions: {json.dumps(stage_a.get('open_questions', [])[:3])}"""
         resp = await groq.chat_completion(
             [{"role": "system", "content": COMPARISON_SYSTEM}, {"role": "user", "content": user_prompt}],
             max_tokens=600, temperature=0.3, priority=TaskPriority.SYNTHESIS,
+            extra={"response_format": {"type": "json_object"}},
         )
-        raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        result = json.loads(raw)
+        result = _parse_json_object(resp.choices[0].message.content)
         # Ensure required keys exist so the frontend guard doesn't hide the tab
         if not result.get("key_tension") or not result.get("synthesis"):
             logger.warning("Comparison LLM response missing required keys", keys=list(result.keys()))
@@ -592,13 +680,9 @@ requires_deadline={has_deadline}"""
         resp = await groq.chat_completion(
             [{"role": "system", "content": DECISION_SYSTEM}, {"role": "user", "content": user_prompt}],
             max_tokens=600, temperature=0.3, priority=TaskPriority.SYNTHESIS,
+            extra={"response_format": {"type": "json_object"}},
         )
-        raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return json.loads(raw)
+        return _parse_json_object(resp.choices[0].message.content)
     except Exception as exc:
         logger.error("Decision build failed", error=str(exc))
         return None

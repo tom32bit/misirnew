@@ -30,6 +30,32 @@ interface CachedToken {
 }
 
 /**
+ * Decode a JWT's payload claims. JWTs are base64URL-encoded (uses '-' and '_',
+ * no padding), which atob() rejects with InvalidCharacterError — so normalize to
+ * standard base64 and pad before decoding, and UTF-8 decode so non-ASCII claims
+ * (e.g. email) survive. Returns null on any malformed input. Used by both the SW
+ * (getBackendToken) and the UI (useAuth) so they decode identically.
+ */
+export function decodeJwtPayload(jwt: string): Record<string, any> | null {
+  const parts = jwt.split('.')
+  if (parts.length !== 3) return null
+  try {
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4
+    if (pad) b64 += '='.repeat(4 - pad)
+    const json = decodeURIComponent(
+      atob(b64)
+        .split('')
+        .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join(''),
+    )
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Retrieve a valid Clerk JWT.
  * 1. Try chrome.storage.session (survives SW idle-kill).
  * 2. If expired/missing, signal the popup/offscreen to refresh.
@@ -45,10 +71,8 @@ async function getBackendToken(): Promise<string | null> {
   try {
     const cookie = await chrome.cookies.get({ url: FRONTEND_URL, name: '__session' })
     if (!cookie?.value) return null
-    const parts = cookie.value.split('.')
-    if (parts.length !== 3) return null
-    const payload = JSON.parse(atob(parts[1]))
-    if (!payload.sub || (payload.exp && payload.exp < Date.now() / 1000)) return null
+    const payload = decodeJwtPayload(cookie.value)
+    if (!payload?.sub || (payload.exp && payload.exp < Date.now() / 1000)) return null
     const token: CachedToken = { jwt: cookie.value, expiresAt: Date.now() + 50_000 }
     await chrome.storage.session.set({ clerkToken: token })
     return cookie.value

@@ -183,8 +183,12 @@ export type KeyTension = {
 }
 
 export type DashboardDecision = {
-  option_a: { label: string; pros: string[]; cons: string[] }
-  option_b: { label: string; pros: string[]; cons: string[] }
+  // question/note/ask are optional: reports cached before these were generated
+  // (or any future model that omits them) fall back to editorial constants.
+  question?: string
+  option_a: { label: string; note?: string; pros: string[]; cons: string[] }
+  option_b: { label: string; note?: string; pros: string[]; cons: string[] }
+  ask?: string
 }
 
 export type ResearchDepth = {
@@ -208,8 +212,18 @@ export type CrossSpaceLink = {
   similarity: number
 }
 
+/** Real per-subspace capture stats, attributed via shared markers on the backend. */
+export type DashboardSubspaceStat = {
+  id: number
+  name: string
+  captures: number
+  completeness: number
+  last_captured_at: string | null
+}
+
 export type DashboardPayload = {
   misirs_read: MisirsRead | null
+  subspaces: DashboardSubspaceStat[]
   sources: DashboardSource[]
   synthesis: DashboardSynthesis | null
   key_tension: KeyTension | null

@@ -4,7 +4,9 @@ GET /chat/{id}/messages
 POST /chat/{id}/messages  (SSE stream)
 POST /chat               (create new conversation)
 """
-from __future__ import annotations
+# NOTE: no `from __future__ import annotations` — see artifacts.py. The
+# @limiter.limit decorator + stringified annotations make FastAPI misclassify
+# the request body / BackgroundTasks as query params (422 "Field required").
 
 import json
 from typing import AsyncGenerator, Optional

@@ -3,7 +3,11 @@ Artifact routes.
 Phase 2: POST /capture, POST /{id}/engagement, GET /cache
 Phase 4: GET /artifacts (search + filter)
 """
-from __future__ import annotations
+# NOTE: deliberately NO `from __future__ import annotations` here. The
+# @limiter.limit (slowapi) decorator wraps these endpoints, so FastAPI would
+# resolve stringified annotations against slowapi's module globals (where
+# CaptureRequest/BackgroundTasks don't exist) and misclassify them as query
+# params — yielding 422 "query -> body: Field required". Real annotations avoid it.
 
 import asyncio
 import hashlib

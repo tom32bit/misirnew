@@ -1,7 +1,7 @@
 "use client"
 
 import { Icon } from "@/components/misir/primitives/Icon"
-import { briefForSpace } from "@/lib/constants/space-briefs"
+import { stripInlineMarkdown } from "@/lib/utils"
 import type { Deadline, MisirsRead, Space } from "@/lib/api/types"
 
 function relUpdated(iso: string | null | undefined): string {
@@ -40,9 +40,16 @@ export function MisirBrief({
   subspaceCount: number
   misirRead?: MisirsRead | null
 }) {
-  const brief = briefForSpace(space, { capturesWeek, subspaceCount })
   const updated = relUpdated(space?.updated_at)
-  const headline = misirRead?.headline ?? brief
+  // Real headline from the backend, or a neutral line computed from real counts
+  // (never editorial demo copy) when Misir hasn't written a read yet.
+  const fallbackHeadline =
+    capturesWeek > 0
+      ? `${capturesWeek} capture${capturesWeek === 1 ? "" : "s"} this week across ${subspaceCount} subspace${subspaceCount === 1 ? "" : "s"}.`
+      : "Capture sources for this space and Misir will start reading."
+  const headline = misirRead?.headline
+    ? stripInlineMarkdown(misirRead.headline)
+    : fallbackHeadline
 
   return (
     <div className="pt-2 pb-6">
@@ -65,8 +72,8 @@ export function MisirBrief({
                 style={{ background: pt.accent ? "var(--accent)" : "var(--fg-faint)" }}
               />
               <span>
-                <strong className="font-semibold text-fg">{pt.label}</strong>
-                {pt.body ? <span className="text-fg-muted"> — {pt.body}</span> : null}
+                <strong className="font-semibold text-fg">{stripInlineMarkdown(pt.label)}</strong>
+                {pt.body ? <span className="text-fg-muted"> — {stripInlineMarkdown(pt.body)}</span> : null}
               </span>
             </li>
           ))}

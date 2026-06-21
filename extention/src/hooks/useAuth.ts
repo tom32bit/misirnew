@@ -7,7 +7,7 @@
  * and host access to http://localhost:3000/*.
  */
 import { useEffect, useState, useCallback } from 'react'
-import { cacheClerkToken, clearClerkToken } from '@/lib/api'
+import { cacheClerkToken, clearClerkToken, decodeJwtPayload } from '@/lib/api'
 
 export interface AuthUser {
   id: string
@@ -22,10 +22,8 @@ async function readClerkCookie(): Promise<{ user: AuthUser; token: string; sid: 
     const cookie = await chrome.cookies.get({ url: FRONTEND_URL, name: '__session' })
     if (!cookie?.value) return null
 
-    const parts = cookie.value.split('.')
-    if (parts.length !== 3) return null
-
-    const payload = JSON.parse(atob(parts[1]))
+    const payload = decodeJwtPayload(cookie.value)
+    if (!payload) return null
 
     // Reject if expired
     if (!payload.sub || (payload.exp && payload.exp < Date.now() / 1000)) return null

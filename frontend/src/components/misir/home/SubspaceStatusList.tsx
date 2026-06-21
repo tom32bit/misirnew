@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
-import { statusForSubspace } from "@/lib/constants/subspace-status"
 import type { Subspace } from "@/lib/api/types"
 import type { SubspaceVM } from "@/lib/api/capture-adapters"
 
@@ -58,10 +57,10 @@ function SubspaceStatusRow({
 }) {
   const router = useRouter()
   const color = getSubspaceColor(subspace)
-  const status = statusForSubspace(subspace.name, {
-    captures: vm.captures,
-    completeness: vm.completeness,
-  })
+  // Real, computed status from this subspace's own capture data — no editorial copy.
+  const status = subspace.description?.trim()
+    ? subspace.description
+    : `${vm.captures} capture${vm.captures === 1 ? "" : "s"} · ${vm.completeness}% complete.`
   const flag = vm.flag
 
   return (

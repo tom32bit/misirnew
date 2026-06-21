@@ -2,7 +2,8 @@
 
 import { ReadinessRing } from "@/components/misir/primitives/ReadinessRing"
 import type { Deadline } from "@/lib/api/types"
-import type { DecisionOption } from "@/lib/constants/space-decisions"
+
+type DecisionOption = { label: string; note: string }
 
 function daysUntil(iso: string): number {
   const t = Date.parse(iso)

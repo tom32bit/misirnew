@@ -66,8 +66,14 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
         subspaces.data ?? [],
         artifactsAll.data ?? [],
         dashboard.data?.research_depth,
+        dashboard.data?.subspaces,
       ),
-    [subspaces.data, artifactsAll.data, dashboard.data?.research_depth],
+    [
+      subspaces.data,
+      artifactsAll.data,
+      dashboard.data?.research_depth,
+      dashboard.data?.subspaces,
+    ],
   )
 
   const todayCaptures = useMemo(
@@ -98,7 +104,12 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
       />
 
       {ch && (
-        <MisirAsks space={ch} subspaces={subspaces.data ?? []} color={color} />
+        <MisirAsks
+          space={ch}
+          subspaces={subspaces.data ?? []}
+          gaps={gaps.data ?? []}
+          color={color}
+        />
       )}
 
       <SectionHead

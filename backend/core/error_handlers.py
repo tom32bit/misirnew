@@ -65,6 +65,19 @@ async def pydantic_validation_error_handler(request: Request, exc: ValidationErr
     )
 
 
+async def request_validation_error_handler(request: Request, exc):
+    """FastAPI body/query validation (RequestValidationError). Logs the exact
+    failing fields server-side — the default handler returns them to the client
+    but logs nothing, leaving 422s opaque in the server log."""
+    errors = [f"{' -> '.join(str(l) for l in e['loc'])}: {e['msg']}" for e in exc.errors()]
+    logger.warning("Request validation failed", path=str(request.url.path), errors=errors)
+    return JSONResponse(
+        status_code=422,
+        content={"status": 422, "title": "Validation Error", "detail": "Request validation failed.", "type": "validation-error", "errors": errors},
+        media_type="application/problem+json",
+    )
+
+
 async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(
         status_code=400,

@@ -116,9 +116,33 @@ interface ArtifactPayload {
   metadata: Record<string, unknown>
 }
 
+// Backend (CaptureRequest) length caps. Readability returns the full article
+// text with no limit, so a long page (Wikipedia, docs) can exceed extracted_text
+// and get rejected with a 422 before any logic runs. Clamp every capped string
+// field here — the single chokepoint all capture paths flow through — to match.
+const CAPS = {
+  url: 4000,
+  normalized_url: 4000,
+  domain: 255,
+  title: 2000,
+  extracted_text: 200_000,
+  content_hash: 200,
+} as const
+
+function clampPayload(p: ArtifactPayload): ArtifactPayload {
+  const clamped = { ...p }
+  for (const [key, max] of Object.entries(CAPS) as [keyof typeof CAPS, number][]) {
+    const v = clamped[key]
+    if (typeof v === 'string' && v.length > max) {
+      clamped[key] = v.slice(0, max)
+    }
+  }
+  return clamped
+}
+
 async function pushArtifactToBackend(payload: ArtifactPayload): Promise<number | null> {
   try {
-    const res: any = await apiCapture(payload)
+    const res: any = await apiCapture(clampPayload(payload))
     return res?.id ?? null
   } catch (err: any) {
     // Consent gate — surface as an opt-in notice, never a silent retry.

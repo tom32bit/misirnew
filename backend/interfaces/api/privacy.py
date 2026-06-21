@@ -10,7 +10,9 @@ Privacy & data-subject-rights routes.
 Consent gates collection elsewhere (see artifacts capture). All actions are
 audited (audit_service) without storing raw personal data.
 """
-from __future__ import annotations
+# NOTE: no `from __future__ import annotations` — see artifacts.py. The
+# @limiter.limit decorator + stringified annotations make FastAPI misclassify
+# the request body / BackgroundTasks as query params (422 "Field required").
 
 import hmac
 from typing import List, Optional

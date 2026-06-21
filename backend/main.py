@@ -11,9 +11,12 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from core.config import get_settings
+from fastapi.exceptions import RequestValidationError
+
 from core.error_handlers import (
     generic_exception_handler,
     pydantic_validation_error_handler,
+    request_validation_error_handler,
     value_error_handler,
 )
 from core.limiter import limiter
@@ -83,6 +86,7 @@ app.add_middleware(MetricsMiddleware)          # outermost — logs every respon
 
 # ── Error handlers ───────────────────────────────────────────────────────────
 
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)
 app.add_exception_handler(ValidationError, pydantic_validation_error_handler)
 app.add_exception_handler(ValueError, value_error_handler)
 app.add_exception_handler(Exception, generic_exception_handler)

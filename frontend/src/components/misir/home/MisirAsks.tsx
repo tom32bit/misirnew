@@ -6,10 +6,10 @@ import { Icon } from "@/components/misir/primitives/Icon"
 import { Button } from "@/components/misir/primitives/Button"
 import { useUIStore } from "@/lib/stores/ui-store"
 import { useMisirAnswer } from "@/lib/hooks/useMisirAnswer"
-import { questionForSpace } from "@/lib/constants/misir-questions"
-import type { Space, Subspace } from "@/lib/api/types"
+import { questionFromGaps } from "@/lib/constants/misir-questions"
+import type { Gap, Space, Subspace } from "@/lib/api/types"
 
-type ResolvedQuestion = NonNullable<ReturnType<typeof questionForSpace>>
+type ResolvedQuestion = NonNullable<ReturnType<typeof questionFromGaps>>
 
 /**
  * Three-state thinking-partner card. Color theming flows from --ma-color
@@ -18,10 +18,12 @@ type ResolvedQuestion = NonNullable<ReturnType<typeof questionForSpace>>
 export function MisirAsks({
   space,
   subspaces,
+  gaps,
   color,
 }: {
   space: Space
   subspaces: Subspace[]
+  gaps: Gap[]
   color: string
 }) {
   const router = useRouter()
@@ -31,7 +33,7 @@ export function MisirAsks({
   const reset = useUIStore((s) => s.resetAsks)
   const dismiss = useUIStore((s) => s.dismissAsks)
 
-  const q = questionForSpace(space, subspaces)
+  const q = questionFromGaps(space, subspaces, gaps)
   const submit = useMisirAnswer(space.id, q)
 
   const submittedTitle = q?.subspace?.name ?? "subspace"
@@ -117,28 +119,27 @@ export function MisirAsks({
   if (!ask.expanded) {
     return (
       <Card style={baseStyle}>
-        <button
-          type="button"
-          onClick={() => toggle(space.id)}
-          className="flex w-full items-center gap-3.5 px-[22px] py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--ma-color)_5%,var(--bg))]"
-        >
-          <span
-            className="flex flex-none items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
-            style={{ color }}
+        <div className="flex items-center gap-3.5 px-[22px] py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--ma-color)_5%,var(--bg))]">
+          <button
+            type="button"
+            onClick={() => toggle(space.id)}
+            className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
           >
-            <Icon name="zap" size={11} />
-            Misir has a question · {submittedTitle}
-          </span>
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-medium leading-[1.4] tracking-[-0.01em] text-fg mobile:overflow-visible mobile:whitespace-normal">
-            {q.question}
-          </span>
+            <span
+              className="flex flex-none items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color }}
+            >
+              <Icon name="zap" size={11} />
+              Misir has a question · {submittedTitle}
+            </span>
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-medium leading-[1.4] tracking-[-0.01em] text-fg mobile:overflow-visible mobile:whitespace-normal">
+              {q.question}
+            </span>
+          </button>
           <Button
             variant="primary"
             colored
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle(space.id)
-            }}
+            onClick={() => toggle(space.id)}
           >
             Answer
             <Icon name="arrow-right" size={12} />
@@ -146,15 +147,12 @@ export function MisirAsks({
           <button
             type="button"
             aria-label="Ask later"
-            onClick={(e) => {
-              e.stopPropagation()
-              dismiss(space.id)
-            }}
+            onClick={() => dismiss(space.id)}
             className="grid h-6 w-6 flex-none place-items-center rounded-sm text-fg-subtle hover:bg-[var(--bg-hover)] hover:text-fg"
           >
             <Icon name="x" size={13} />
           </button>
-        </button>
+        </div>
       </Card>
     )
   }

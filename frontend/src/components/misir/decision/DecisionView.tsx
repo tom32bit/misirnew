@@ -1,13 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { SectionHead } from "@/components/misir/primitives/Card"
 import { ChatCTA } from "@/components/misir/primitives/ChatCTA"
 import { ReadinessRing } from "@/components/misir/primitives/ReadinessRing"
-import { useSpaces, useSpace } from "@/lib/hooks/useSpaces"
+import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboard, useDashboards } from "@/lib/hooks/useDashboard"
 import { useGaps } from "@/lib/hooks/useGaps"
 import { useDeadline } from "@/lib/hooks/useDeadline"
@@ -15,7 +15,6 @@ import {
   countCriticalGaps,
   deriveReadiness,
 } from "@/lib/api/adapters"
-import { getDecisionForSpace } from "@/lib/constants/space-decisions"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import { useUIStore } from "@/lib/stores/ui-store"
 import type { ReportPeriod, Space } from "@/lib/api/types"
@@ -206,40 +205,47 @@ function SpaceDecisionCard({
 function DecisionBody({ spaceId }: { spaceId: number }) {
   const sp = useSearchParams()
   const period = (sp.get("period") ?? "week") as ReportPeriod
-  const space = useSpace(spaceId)
   const dashboard = useDashboard(spaceId, period)
   const gaps = useGaps(spaceId)
   const deadline = useDeadline(spaceId)
   const openModal = useUIStore((s) => s.openModal)
 
-  const dec = useMemo(() => getDecisionForSpace(space.data), [space.data])
   const readiness = deriveReadiness(dashboard.data)
   const backendDec = dashboard.data?.decision
 
-  const optionA = {
-    label: backendDec?.option_a.label ?? dec.optionA.label,
-    note: dec.optionA.note,
+  // No editorial fallback. When Misir hasn't built a decision yet (new space,
+  // too few captures, or the LLM hasn't run), show an honest empty state rather
+  // than fabricated demo content.
+  if (!backendDec) {
+    return (
+      <>
+        <DecisionEmpty loading={dashboard.isLoading} readiness={readiness} />
+        <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} />
+      </>
+    )
   }
-  const optionB = {
-    label: backendDec?.option_b.label ?? dec.optionB.label,
-    note: dec.optionB.note,
-  }
-  const pros = backendDec?.option_a.pros ?? dec.for
-  const cons = backendDec?.option_a.cons ?? dec.against
+
+  // Everything below is derived from real backend output only. The few `??`
+  // here fall back to values derived from the decision itself (never demo text).
+  const question =
+    backendDec.question ?? `${backendDec.option_a.label} or ${backendDec.option_b.label}?`
+  const optionA = { label: backendDec.option_a.label, note: backendDec.option_a.note ?? "" }
+  const optionB = { label: backendDec.option_b.label, note: backendDec.option_b.note ?? "" }
+  const ask = backendDec.ask ?? "Want to talk through this decision?"
 
   return (
     <>
       <DecisionHero
-        question={dec.question}
+        question={question}
         optionA={{ ...optionA, readiness }}
         optionB={{ ...optionB, readiness: 0 }}
         readiness={readiness}
         deadline={deadline.data ?? null}
       />
-      <ProConGrid pros={pros} cons={cons} />
+      <ProConGrid pros={backendDec.option_a.pros} cons={backendDec.option_a.cons} />
       <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} />
       <ChatCTA
-        title={dec.ask}
+        title={ask}
         hint="Misir uses your captures + subspace context to answer."
         ctaLabel={
           <>
@@ -252,5 +258,36 @@ function DecisionBody({ spaceId }: { spaceId: number }) {
         }
       />
     </>
+  )
+}
+
+function DecisionEmpty({
+  loading,
+  readiness,
+}: {
+  loading: boolean
+  readiness: number
+}) {
+  return (
+    <div className="rounded-[10px] border border-border bg-bg-muted/40 px-[22px] py-9 text-center">
+      <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-subtle">
+        Active strategic decision
+      </div>
+      <div className="mx-auto max-w-md font-display text-[17px] font-semibold leading-[1.35] tracking-tight text-fg">
+        {loading
+          ? "Analyzing your captures…"
+          : "Not enough signal yet to frame a decision"}
+      </div>
+      <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.55] text-fg-muted">
+        {loading
+          ? "Misir is reading what you've captured for this space."
+          : "Capture a few more sources for this space and Misir will frame the key decision, the options, and the trade-offs — drawn from your own research."}
+      </p>
+      {!loading && (
+        <div className="mt-3 font-mono text-[11.5px] text-fg-subtle">
+          Source coverage {readiness}%
+        </div>
+      )}
+    </div>
   )
 }
