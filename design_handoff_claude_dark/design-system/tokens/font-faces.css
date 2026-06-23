@@ -1,0 +1,155 @@
+/* ============================================================
+   SELF-HOSTED BRAND FONTS (@font-face)
+   Uploaded by the user. Family names match the token stacks
+   in fonts.css so --font-* pick them up automatically.
+
+   Wired:  Copernicus (display serif) — trial files
+           Styrene B LC (UI sans) — StyreneB trial files
+           Tiempos Text (body serif) — TestTiemposText trial files
+   ============================================================ */
+
+/* ---- Tiempos Text · --font-serif ---- */
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-Regular-BF66457a50cd521.otf") format("opentype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-RegularItalic-BF66457a50421c2.otf") format("opentype");
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-Medium-BF66457a508489a.otf") format("opentype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-MediumItalic-BF66457a508d6d9.otf") format("opentype");
+  font-weight: 500; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-Semibold-BF66457a4fed201.otf") format("opentype");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-SemiboldItalic-BF66457a505477c.otf") format("opentype");
+  font-weight: 600; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-Bold-BF66457a4f03c40.otf") format("opentype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("../fonts/TestTiemposText-BoldItalic-BF66457a50155b4.otf") format("opentype");
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+
+/* ---- Styrene B LC · --font-sans ---- */
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Thin-Trial-BF63f6cc84a4246.otf") format("opentype");
+  font-weight: 100; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Light-Trial-BF63f6cbe64b47b.otf") format("opentype");
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-LightItalic-Trial-BF63f6cbe9d67d1.otf") format("opentype");
+  font-weight: 300; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Regular-Trial-BF63f6cbe9db1d5.otf") format("opentype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-RegularItalic-Trial-BF63f6cbe5c1942.otf") format("opentype");
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Medium-Trial-BF63f6cc85760c2.otf") format("opentype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-MediumItalic-Trial-BF63f6cc84a421a.otf") format("opentype");
+  font-weight: 500; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Bold-Trial-BF63f6cbe9f13bb.otf") format("opentype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-BoldItalic-Trial-BF63f6cbe6863e6.otf") format("opentype");
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url("../fonts/StyreneB-Black-Trial-BF63f6cbe3dc69b.otf") format("opentype");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+
+/* ---- Copernicus · --font-display ---- */
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Book-BF66160450c2e92.ttf") format("truetype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-BookItalic-BF661604511b981.ttf") format("truetype");
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Medium-BF66160450d988d.ttf") format("truetype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-MediumItalic-BF6616045177c71.ttf") format("truetype");
+  font-weight: 500; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Semibold-BF66160451692c7.ttf") format("truetype");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-SemiboldItalic-BF661604516314e.ttf") format("truetype");
+  font-weight: 600; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Bold-BF6616045097aac.ttf") format("truetype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-BoldItalic-BF6616045093ed8.ttf") format("truetype");
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Extrabold-BF661604510c584.ttf") format("truetype");
+  font-weight: 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url("../fonts/CopernicusTrial-Heavy-BF6616045153731.ttf") format("truetype");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
