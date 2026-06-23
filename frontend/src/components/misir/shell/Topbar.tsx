@@ -91,7 +91,7 @@ export function Topbar() {
 
   return (
     <div
-      className="grid h-[52px] flex-none items-center gap-4 border-b border-border px-[18px] mobile:h-12 mobile:grid-cols-[auto_1fr] mobile:px-2.5"
+      className="grid h-[52px] flex-none items-center gap-4 border-b border-border px-[18px] mobile:h-12 mobile:grid-cols-[auto_1fr_auto] mobile:gap-2 mobile:px-2.5"
       style={{ gridTemplateColumns: "1fr auto 1fr" }}
     >
       {/* Breadcrumb */}
@@ -110,7 +110,7 @@ export function Topbar() {
           <span className="text-[13px] font-medium text-fg">{viewLabel}</span>
         ) : (
           <span
-            className="text-[13px] font-medium text-fg"
+            className="font-serif text-[13px] font-medium text-fg"
             style={
               activeSpace ? { color: getSpaceColor(activeSpace) } : undefined
             }
@@ -162,7 +162,24 @@ export function Topbar() {
         </button>
       </div>
 
-      <div className="justify-self-end mobile:hidden" />
+      {/* Desktop right column: empty. Mobile: compact period cycle button. */}
+      <div className="justify-self-end">
+        <button
+          type="button"
+          aria-label="Switch time range"
+          onClick={() => setPeriod((safePeriodIdx + 1) % PERIODS.length)}
+          className="hidden mobile:flex items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1 font-mono text-[11px] font-medium text-fg-muted active:bg-bg-muted"
+        >
+          {customDate
+            ? new Date(customDate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })
+            : PERIODS[safePeriodIdx] === "today"
+              ? "Today"
+              : PERIODS[safePeriodIdx] === "week"
+                ? "Week"
+                : "Month"}
+          <Icon name="chevron-right" size={11} />
+        </button>
+      </div>
     </div>
   )
 }

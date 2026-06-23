@@ -1,7 +1,10 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 import { Icon } from "@/components/misir/primitives/Icon"
+import { Card, ProgressBar } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
 import type { Subspace } from "@/lib/api/types"
 import type { SubspaceVM } from "@/lib/api/capture-adapters"
@@ -23,30 +26,28 @@ export function SubspaceStatusList({
     )
   }
 
-  // Index VMs by id so callers can pass `vms` from anywhere.
   const byId = new Map<number, SubspaceVM>()
   for (const v of vms) byId.set(v.id, v)
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-border">
+    <div className="grid grid-cols-3 gap-3 mobile:grid-cols-2">
       {subspaces.map((s) => {
-        const vm =
-          byId.get(s.id) ?? {
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            captures: 0,
-            weekDelta: 0,
-            completeness: 0,
-            lastHit: "—",
-          }
-        return <SubspaceStatusRow key={s.id} spaceId={spaceId} subspace={s} vm={vm} />
+        const vm = byId.get(s.id) ?? {
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          captures: 0,
+          weekDelta: 0,
+          completeness: 0,
+          lastHit: "—",
+        }
+        return <SubspaceCard key={s.id} spaceId={spaceId} subspace={s} vm={vm} />
       })}
     </div>
   )
 }
 
-function SubspaceStatusRow({
+function SubspaceCard({
   spaceId,
   subspace,
   vm,
@@ -57,14 +58,10 @@ function SubspaceStatusRow({
 }) {
   const router = useRouter()
   const color = getSubspaceColor(subspace)
-  // Real, computed status from this subspace's own capture data — no editorial copy.
-  const status = subspace.description?.trim()
-    ? subspace.description
-    : `${vm.captures} capture${vm.captures === 1 ? "" : "s"} · ${vm.completeness}% complete.`
   const flag = vm.flag
 
   return (
-    <div
+    <Card
       role="button"
       tabIndex={0}
       onClick={() =>
@@ -76,98 +73,61 @@ function SubspaceStatusRow({
           router.push(`/dashboard/${spaceId}/collection?sub=${subspace.id}`)
         }
       }}
-      className={[
-        "grid cursor-pointer border-b border-border bg-bg pr-[18px] pl-0 py-3.5 transition-colors last:border-b-0 hover:bg-bg-muted",
-        flag === "critical" ? "bg-[rgba(255,108,60,0.03)] hover:bg-[rgba(255,108,60,0.06)]" : "",
-        flag === "low" ? "opacity-80" : "",
-      ].join(" ")}
-      style={{
-        gridTemplateColumns: "5px 1fr auto",
-        gridTemplateRows: "auto auto auto",
-        columnGap: "18px",
-      }}
+      className={cn(
+        "h-[148px] cursor-pointer border-t-[3px] transition-colors hover:bg-bg-muted focus-visible:outline-none",
+        flag === "critical" && "bg-[rgba(255,108,60,0.02)]",
+        flag === "low" && "opacity-75",
+      )}
+      style={{ borderTopColor: color } as React.CSSProperties}
     >
-      {/* Lane bar spans all 3 rows */}
-      <div
-        className="rounded-r-sm"
-        style={{
-          gridRow: "1 / 4",
-          gridColumn: "1",
-          background: color,
-          alignSelf: "stretch",
-          width: 5,
-        }}
-      />
-
-      {/* Head row */}
-      <div
-        className="flex items-center gap-2.5"
-        style={{ gridColumn: "2", gridRow: "1" }}
-      >
-        <span className="text-[13.5px] font-semibold tracking-[-0.01em] text-fg">
+      <div className="flex h-full flex-col p-4">
+        {/* Name — grows to fill vertical space */}
+        <p className="flex-1 font-serif text-[13.5px] font-semibold leading-snug text-fg">
           {subspace.name}
-        </span>
+        </p>
+
+        {/* Badge (only when flagged) */}
         {flag === "critical" && (
-          <span className="inline-flex items-center gap-1 rounded-sm bg-[rgba(255,108,60,0.10)] px-1.5 py-px font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-accent">
-            <Icon name="alert-circle" size={11} />
-            Critical
-          </span>
+          <div className="mb-3">
+            <Badge variant="revisit">
+              <Icon name="alert-circle" size={10} />
+              Critical
+            </Badge>
+          </div>
         )}
         {flag === "low" && (
-          <span className="inline-flex items-center gap-1 rounded-sm bg-bg-muted px-1.5 py-px font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
-            <Icon name="alert-triangle" size={11} />
-            Needs pull
-          </span>
+          <div className="mb-3">
+            <Badge
+              variant="secondary"
+              className="font-semibold uppercase tracking-[0.08em]"
+            >
+              <Icon name="alert-triangle" size={10} />
+              Needs pull
+            </Badge>
+          </div>
         )}
-      </div>
 
-      {/* Progress bar */}
-      <div
-        className="flex items-center gap-2.5 pt-0.5"
-        style={{ gridColumn: "3", gridRow: "1" }}
-      >
-        <div className="h-[3px] w-[80px] overflow-hidden rounded-[3px] bg-border-strong">
-          <div
-            className="h-full rounded-[inherit]"
-            style={{ width: `${vm.completeness}%`, background: color }}
-          />
+        {/* Progress + stats pinned to bottom */}
+        <div className="flex flex-col gap-1.5">
+          <ProgressBar value={vm.completeness} color={color} />
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] text-fg-subtle">
+              {vm.captures} capture{vm.captures === 1 ? "" : "s"}
+              {vm.weekDelta > 0 && (
+                <span className="ml-1 font-semibold" style={{ color }}>
+                  +{vm.weekDelta}
+                </span>
+              )}
+            </span>
+            <span
+              className="font-mono text-[11px] font-semibold tracking-wide"
+              style={{ color }}
+            >
+              {vm.completeness}%
+            </span>
+          </div>
         </div>
-        <span
-          className="min-w-[28px] text-right font-mono text-[11px] font-semibold tracking-wide"
-          style={{ color }}
-        >
-          {vm.completeness}%
-        </span>
       </div>
-
-      {/* Status line */}
-      <p
-        className="m-0 mt-1.5 text-[12.5px] leading-[1.5] text-fg-muted"
-        style={{ gridColumn: "2 / 4", gridRow: "2" }}
-      >
-        {status}
-      </p>
-
-      {/* Footer */}
-      <div
-        className="mt-1.5 flex items-center gap-2"
-        style={{ gridColumn: "2 / 4", gridRow: "3" }}
-      >
-        <span className="font-mono text-[10.5px] text-fg-subtle">
-          {vm.captures} capture{vm.captures === 1 ? "" : "s"}
-        </span>
-        {vm.weekDelta > 0 && (
-          <span
-            className="font-mono text-[10.5px] font-semibold"
-            style={{ color }}
-          >
-            +{vm.weekDelta} this week
-          </span>
-        )}
-        <span className="ml-auto font-mono text-[10.5px] text-fg-subtle">
-          {vm.lastHit}
-        </span>
-      </div>
-    </div>
+    </Card>
   )
 }

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -48,10 +48,10 @@ export function MisirAsks({
       <Card style={baseStyle}>
         <Header subspaceName={submittedTitle} prefix="Misir asked" />
         <div className="py-0 pl-[22px] pr-[18px] font-display text-[20px] font-semibold leading-[1.4] tracking-[-0.015em] text-fg [text-wrap:pretty]">
-          “{q.question}”
+          "{q.question}"
         </div>
         <div className="px-[22px] pt-1 text-[13.5px] italic text-fg-muted">
-          “{ask.submitted}”
+          "{ask.submitted}"
         </div>
         <div className="flex items-center gap-2.5 px-[22px] py-4 text-[13px] text-fg-muted">
           <TypingDots />
@@ -71,8 +71,8 @@ export function MisirAsks({
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
               You said
             </span>
-            <p className="m-0 rounded-md bg-bg-muted px-3.5 py-2.5 text-[13.5px] italic leading-[1.55] text-fg">
-              “{ask.submitted}”
+            <p className="m-0 rounded-md bg-bg-muted px-3.5 py-2.5 font-serif text-[13.5px] italic leading-[1.55] text-fg">
+              "{ask.submitted}"
             </p>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -82,7 +82,7 @@ export function MisirAsks({
             >
               Misir
             </span>
-            <p className="m-0 text-[14.5px] leading-[1.65] text-fg [text-wrap:pretty]">
+            <p className="m-0 font-serif text-[14.5px] leading-[1.65] text-fg [text-wrap:pretty]">
               {ask.response}
             </p>
           </div>
@@ -119,20 +119,21 @@ export function MisirAsks({
   if (!ask.expanded) {
     return (
       <Card style={baseStyle}>
-        <div className="flex items-center gap-3.5 px-[22px] py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--ma-color)_5%,var(--bg))]">
+        <div className="flex items-center gap-0 px-[22px] py-[11px] transition-colors hover:bg-[color-mix(in_srgb,var(--ma-color)_5%,var(--bg))]">
           <button
             type="button"
             onClick={() => toggle(space.id)}
-            className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
+            className="flex min-w-0 flex-1 items-center gap-0 text-left"
           >
             <span
-              className="flex flex-none items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+              className="flex flex-none items-center gap-1.5 pr-3.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap"
               style={{ color }}
             >
               <Icon name="zap" size={11} />
-              Misir has a question · {submittedTitle}
+              Misir asks · {submittedTitle}
             </span>
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-medium leading-[1.4] tracking-[-0.01em] text-fg mobile:overflow-visible mobile:whitespace-normal">
+            <span className="mr-3.5 h-3.5 w-px flex-none bg-[color-mix(in_srgb,var(--ma-color)_25%,var(--border))]" />
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14.5px] font-medium leading-[1.4] tracking-[-0.012em] text-fg mobile:overflow-visible mobile:whitespace-normal">
               {q.question}
             </span>
           </button>
@@ -148,7 +149,7 @@ export function MisirAsks({
             type="button"
             aria-label="Ask later"
             onClick={() => dismiss(space.id)}
-            className="grid h-6 w-6 flex-none place-items-center rounded-sm text-fg-subtle hover:bg-[var(--bg-hover)] hover:text-fg"
+            className="ml-2 grid h-6 w-6 flex-none place-items-center rounded-sm text-fg-subtle hover:bg-[var(--bg-hover)] hover:text-fg"
           >
             <Icon name="x" size={13} />
           </button>

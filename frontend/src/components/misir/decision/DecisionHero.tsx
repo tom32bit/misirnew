@@ -29,7 +29,7 @@ export function DecisionHero({
       <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-accent">
         Active strategic decision
       </div>
-      <div className="mb-3.5 font-display text-[22px] font-semibold leading-[1.25] tracking-tight text-fg">
+      <div className="mb-3.5 font-display text-[22px] font-medium leading-[1.25] tracking-tight text-fg">
         {question}
       </div>
 
@@ -53,7 +53,7 @@ export function DecisionHero({
           showPercent
           fontSize={13}
         />
-        <div className="flex-1 text-[13px] leading-[1.55] text-fg-muted">
+        <div className="flex-1 font-serif text-[13px] leading-[1.55] text-fg-muted">
           <strong className="font-semibold text-fg">
             Source coverage {readiness}%.
           </strong>{" "}

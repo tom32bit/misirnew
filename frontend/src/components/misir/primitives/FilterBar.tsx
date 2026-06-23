@@ -70,7 +70,7 @@ export function Segmented<T extends string>({
               "h-[26px] px-2.5 text-[11.5px] transition-colors",
               i > 0 && "border-l border-border",
               active
-                ? "bg-bg-muted font-medium text-fg"
+                ? "bg-bg-muted font-medium text-[#207FDE]"
                 : "text-fg-muted hover:text-fg",
             )}
           >

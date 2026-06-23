@@ -15,13 +15,15 @@ import {
 } from "@/components/misir/primitives/FilterBar"
 import { Chip } from "@/components/misir/primitives/Chip"
 import { SubspaceTag, SpaceTag } from "@/components/misir/primitives/Tag"
+import { Skeleton } from "@/components/misir/primitives/Skeleton"
 import { useArtifacts, useDeleteArtifact } from "@/lib/hooks/useArtifacts"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useSubspaces } from "@/lib/hooks/useSubspaces"
+import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import { adaptCaptures, type CaptureVM } from "@/lib/api/capture-adapters"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
-import type { PlatformType, ReportPeriod, Space, Subspace } from "@/lib/api/types"
+import type { PlatformType, Space, Subspace } from "@/lib/api/types"
 
 type Scope = "all" | number
 
@@ -69,7 +71,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
   const search = useSearchParams()
   const router = useRouter()
   const isAll = scope === "all"
-  const period = (search.get("period") ?? "week") as ReportPeriod
+  const { period, date, tzOffset } = usePeriodParams()
 
   const { data: spaces = [] } = useSpaces()
 
@@ -103,6 +105,8 @@ export function CollectionView({ scope }: { scope: Scope }) {
   const artifactOpts = {
     spaceId: effectiveSpaceId,
     period,
+    date,
+    tzOffset,
     q: debouncedQ.trim() || undefined,
     limit: 200,
   }
@@ -110,8 +114,8 @@ export function CollectionView({ scope }: { scope: Scope }) {
   const deleteArtifact = useDeleteArtifact(artifactOpts)
 
   const captures = useMemo(
-    () => adaptCaptures(artifacts.data ?? []),
-    [artifacts.data],
+    () => adaptCaptures(artifacts.data ?? [], new Date(), subspaces.data ?? []),
+    [artifacts.data, subspaces.data],
   )
 
   // Counts per type (over the unfiltered fetched set so the segment labels
@@ -181,7 +185,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
                 setSpaceFilter(e.target.value)
                 setSubFilter("all")
               }}
-              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-accent"
+              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-[#61AAF2]"
             >
               <option value="all">All spaces</option>
               {spaces.map((s) => (
@@ -203,7 +207,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
                 const qs = sp.toString()
                 router.replace(qs ? `?${qs}` : "?")
               }}
-              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-accent"
+              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-[#61AAF2]"
             >
               <option value="all">All subspaces</option>
               {(subspaces.data ?? []).map((s) => (
@@ -219,14 +223,31 @@ export function CollectionView({ scope }: { scope: Scope }) {
             placeholder="Search title, marker, source…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-7 min-w-[200px] rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none placeholder:text-fg-faint focus:outline-2 focus:outline-accent focus:-outline-offset-1"
+            className="h-7 min-w-[200px] rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none placeholder:text-fg-faint focus:outline-2 focus:outline-[#61AAF2] focus:-outline-offset-1"
           />
           <FilterCount>
             {filtered.length} of {captures.length}
           </FilterCount>
         </FilterBar>
 
-        {filtered.length === 0 ? (
+        {artifacts.isLoading && !artifacts.data ? (
+          <>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <CaptureRowSkeleton key={i} />
+            ))}
+          </>
+        ) : artifacts.isError ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+            <div className="text-[13px] font-medium text-fg">Couldn&apos;t load captures</div>
+            <div className="text-[12.5px] text-fg-muted">Check your connection and try again.</div>
+            <button
+              onClick={() => artifacts.refetch()}
+              className="mt-1 rounded-md border border-border-strong bg-bg px-4 py-2 text-[13px] text-fg-muted transition-colors hover:bg-bg-muted hover:text-fg"
+            >
+              Retry
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="px-6 py-8 text-center text-[13px] text-fg-subtle">
             {captures.length === 0
               ? "No captures yet. Install the extension to start capturing."
@@ -247,6 +268,23 @@ export function CollectionView({ scope }: { scope: Scope }) {
         )}
       </Card>
     </>
+  )
+}
+
+function CaptureRowSkeleton() {
+  return (
+    <div
+      className="grid items-center gap-3.5 border-b border-border px-4 py-2.5 mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
+      style={{ gridTemplateColumns: "60px 110px 1fr auto" }}
+    >
+      <Skeleton className="h-3 w-10" />
+      <Skeleton className="h-3 w-20 mobile:hidden" />
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-5 w-14 rounded-full" />
+        <Skeleton className="h-3 w-44" />
+      </div>
+      <Skeleton className="h-5 w-16 rounded-full" />
+    </div>
   )
 }
 

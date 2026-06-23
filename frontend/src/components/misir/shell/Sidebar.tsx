@@ -186,8 +186,16 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
                 <span className="inline-flex shrink-0" style={{ color }}>
                   <Icon name="target" size={14} />
                 </span>
-                <span className="truncate">{s.name}</span>
+                <span className="truncate font-serif">{s.name}</span>
               </Link>
+              <button
+                type="button"
+                aria-label={`Edit ${s.name}`}
+                onClick={() => openModal({ kind: "edit-space", spaceId: s.id })}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded text-fg-subtle opacity-0 transition-opacity hover:bg-bg-muted hover:text-fg group-hover/space-row:opacity-100"
+              >
+                <Icon name="pencil" size={11} />
+              </button>
               <button
                 type="button"
                 aria-label={`Delete ${s.name}`}

@@ -40,8 +40,8 @@ export function TensionTable({
               <div className="font-mono text-[10px] text-fg-subtle">
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <div className="text-[13px] font-semibold text-fg">{r.from}</div>
-              <div className="text-[13px] leading-[1.5] text-fg-muted">
+              <div className="font-serif text-[13px] font-semibold text-fg">{r.from}</div>
+              <div className="font-serif text-[13px] leading-[1.5] text-fg-muted">
                 {r.stance}
               </div>
             </div>
@@ -52,7 +52,7 @@ export function TensionTable({
       {edge && (
         <div
           className={[
-            "mt-3.5 flex items-center gap-3 text-[13px] leading-[1.5] text-fg",
+            "mt-3.5 flex items-center gap-3 font-serif text-[13px] leading-[1.5] text-fg",
             rows.length > 0 ? "border-t border-border pt-3.5" : "",
             "before:font-bold before:text-accent before:content-['→']",
           ].join(" ")}

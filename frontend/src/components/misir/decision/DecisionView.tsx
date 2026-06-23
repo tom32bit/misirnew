@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { SectionHead } from "@/components/misir/primitives/Card"
 import { ChatCTA } from "@/components/misir/primitives/ChatCTA"
@@ -11,13 +10,14 @@ import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboard, useDashboards } from "@/lib/hooks/useDashboard"
 import { useGaps } from "@/lib/hooks/useGaps"
 import { useDeadline } from "@/lib/hooks/useDeadline"
+import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import {
   countCriticalGaps,
   deriveReadiness,
 } from "@/lib/api/adapters"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import { useUIStore } from "@/lib/stores/ui-store"
-import type { ReportPeriod, Space } from "@/lib/api/types"
+import type { Space } from "@/lib/api/types"
 import { DecisionHero } from "./DecisionHero"
 import { ProConGrid } from "./ProConGrid"
 import { KnowledgeGaps } from "./KnowledgeGaps"
@@ -30,12 +30,13 @@ export function DecisionView({ scope }: { scope: Scope }) {
 }
 
 function DecisionAll() {
-  const sp = useSearchParams()
-  const period = (sp.get("period") ?? "week") as ReportPeriod
+  const { period, date, tzOffset } = usePeriodParams()
   const { data: spaces = [] } = useSpaces()
   const dashboards = useDashboards(
     spaces.map((s) => s.id),
     period,
+    tzOffset,
+    date,
   )
   const [activeId, setActiveId] = useState<number | null>(spaces[0]?.id ?? null)
   const effectiveId = activeId ?? spaces[0]?.id ?? null
@@ -145,7 +146,7 @@ function SpaceDecisionCard({
       style={{ borderTop: `4px solid ${color}` }}
     >
       <div>
-        <div className="font-display text-[16px] font-semibold tracking-[-0.015em] text-fg">
+        <div className="font-serif text-[16px] font-semibold text-fg">
           {space.name}
         </div>
       </div>
@@ -203,9 +204,8 @@ function SpaceDecisionCard({
 }
 
 function DecisionBody({ spaceId }: { spaceId: number }) {
-  const sp = useSearchParams()
-  const period = (sp.get("period") ?? "week") as ReportPeriod
-  const dashboard = useDashboard(spaceId, period)
+  const { period, date, tzOffset } = usePeriodParams()
+  const dashboard = useDashboard(spaceId, period, tzOffset, date)
   const gaps = useGaps(spaceId)
   const deadline = useDeadline(spaceId)
   const openModal = useUIStore((s) => s.openModal)
@@ -278,7 +278,7 @@ function DecisionEmpty({
           ? "Analyzing your captures…"
           : "Not enough signal yet to frame a decision"}
       </div>
-      <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.55] text-fg-muted">
+      <p className="mx-auto mt-2 max-w-md font-serif text-[13px] leading-[1.55] text-fg-muted">
         {loading
           ? "Misir is reading what you've captured for this space."
           : "Capture a few more sources for this space and Misir will frame the key decision, the options, and the trade-offs — drawn from your own research."}

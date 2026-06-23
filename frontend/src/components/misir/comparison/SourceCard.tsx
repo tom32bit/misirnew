@@ -19,7 +19,7 @@ export function SourceCard({
         style={{ borderLeft: `3px solid ${color}` }}
       >
         <div className="flex items-center justify-between">
-          <span className="text-[14px] font-semibold tracking-[-0.01em] text-fg">
+          <span className="font-serif text-[14px] font-semibold text-fg">
             {source.label}
           </span>
           <span className="rounded-full border border-border bg-bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-fg">
@@ -27,7 +27,7 @@ export function SourceCard({
           </span>
         </div>
         {source.summary && (
-          <p className="text-[12.5px] leading-[1.5] text-fg opacity-90">
+          <p className="font-serif text-[12.5px] leading-[1.5] text-fg opacity-90">
             {source.summary}
           </p>
         )}
@@ -58,7 +58,7 @@ export function SourceCard({
                     />
                   </div>
                 </div>
-                <div className="text-[12.5px] leading-[1.45] text-fg-muted">
+                <div className="font-serif text-[12.5px] leading-[1.45] text-fg-muted">
                   {f.text}
                 </div>
               </div>
@@ -75,7 +75,7 @@ export function SourceCard({
           <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg">
             Unique signal
           </div>
-          <div className="text-[12px] leading-[1.5] text-fg-muted">
+          <div className="font-serif text-[12px] leading-[1.5] text-fg-muted">
             {source.signal}
           </div>
         </div>

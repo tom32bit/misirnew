@@ -163,8 +163,8 @@ function Bubble({ msg }: { msg: ChatMessage }) {
         className={[
           "rounded-lg px-3.5 py-2.5 text-[13.5px] leading-[1.55]",
           isUser
-            ? "bg-bg-muted text-fg"
-            : "bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-fg",
+            ? "bg-bg-muted font-sans text-fg"
+            : "bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] font-serif text-fg",
         ].join(" ")}
       >
         {isUser ? msg.content : <MisirMarkdown content={msg.content} />}
@@ -179,7 +179,7 @@ function StreamingBubble({ partial }: { partial: string }) {
       <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
         Misir
       </span>
-      <div className="rounded-lg border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] px-3.5 py-2.5 text-[13.5px] leading-[1.55] text-fg">
+      <div className="rounded-lg border border-[color-mix(in_srgb,var(--accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg))] px-3.5 py-2.5 font-serif text-[13.5px] leading-[1.55] text-fg">
         {partial ? (
           <>
             <MisirMarkdown content={partial} />

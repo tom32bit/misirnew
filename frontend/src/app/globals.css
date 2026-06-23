@@ -1,79 +1,166 @@
+/* Self-hosted design system fonts */
+
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-Italic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Styrene B LC";
+  src: url('/fonts/StyreneB-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-Italic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url('/fonts/TiemposText-SemiboldItalic.otf') format('opentype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Copernicus";
+  src: url('/fonts/Copernicus-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Copernicus";
+  src: url('/fonts/Copernicus-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @import "tailwindcss";
 
-/* Enable class-based dark mode (Tailwind v4 replaces darkMode: 'class') */
+/* Class-based dark mode */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ============================================================
-   Misir design tokens — registered with Tailwind so utilities
-   like bg-accent, text-fg-muted, border-border get generated.
-   Hex, not HSL. The palette is brand-locked.
-   ============================================================ */
-
 @theme {
-  /* ---------- Fonts (next/font supplies the variables in layout.tsx) ---------- */
-  --font-sans: var(--font-inter), "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
-  --font-display: var(--font-inter-tight), var(--font-inter), "Helvetica Neue", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* ── Fonts ──────────────────────────────────────────────────────────── */
+  --font-sans:    "Styrene B LC", "Hanken Grotesk", system-ui, sans-serif;
+  --font-serif:   "Tiempos Text", "Newsreader", Georgia, serif;
+  --font-display: "Copernicus", "Newsreader", Georgia, serif;
+  --font-mono:    "Fira Code", ui-monospace, Menlo, Consolas, monospace;
 
-  /* ---------- Brand ---------- */
-  --color-accent: #FF6C3C;
-  --color-accent-hover: #F25C2A;
-  --color-accent-press: #DC4D1C;
-  --color-accent-soft: #FFE8DF;
-  --color-accent-tint: #FFF4EE;
+  /* ── Claude dark brand palette ──────────────────────────────────────── */
+  --color-slate-dark:   #191919;
+  --color-slate-medium: #262625;
+  --color-slate-light:  #40403E;
+  --color-cloud-dark:   #666663;
+  --color-cloud-medium: #91918D;
+  --color-cloud-light:  #BFBFBA;
+  --color-ivory-dark:   #E5E4DF;
+  --color-ivory-medium: #F0F0EB;
+  --color-ivory-light:  #FAFAF7;
+  --color-hero-manilla: #EBDBBC;
 
-  /* ---------- Warm gray scale ---------- */
-  --color-gray-0:   #FFFFFF;
-  --color-gray-25:  #FAFAF9;
-  --color-gray-50:  #F5F4F2;
-  --color-gray-100: #ECEAE6;
-  --color-gray-150: #E0DDD8;
-  --color-gray-200: #D4D0CA;
-  --color-gray-300: #B8B3AC;
-  --color-gray-400: #908A82;
-  --color-gray-500: #6E6862;
-  --color-gray-600: #4F4A45;
-  --color-gray-700: #36322E;
-  --color-gray-800: #211E1B;
-  --color-gray-900: #141210;
+  /* ── Accents ────────────────────────────────────────────────────────── */
+  --color-accent:        #D97757;
+  --color-accent-hover:  #C86A47;
+  --color-accent-press:  #B55F3E;
+  --color-accent-soft:   rgba(217, 119, 87, 0.15);
+  --color-accent-tint:   rgba(217, 119, 87, 0.07);
+  --color-accent-blue:   #207FDE;
+  --color-accent-purple: #9B87F5;
 
-  /* ---------- Status ---------- */
+  /* ── Clay button ────────────────────────────────────────────────────── */
+  --color-clay-fill:   #AA532E;
+  --color-clay-border: #9C5A3C;
+
+  /* ── States ─────────────────────────────────────────────────────────── */
+  --color-focus:   #61AAF2;
+  --color-danger:  #BF4D43;
   --color-success: #2E7D55;
   --color-warning: #B8730D;
-  --color-danger:  #C0392B;
 
-  /* ---------- Semantic surface + text utilities ---------- */
-  --color-bg:           var(--bg);
-  --color-bg-subtle:    var(--bg-subtle);
-  --color-bg-muted:     var(--bg-muted);
-  --color-bg-inset:     var(--bg-inset);
-  --color-fg:           var(--fg);
-  --color-fg-muted:     var(--fg-muted);
-  --color-fg-subtle:    var(--fg-subtle);
-  --color-fg-faint:     var(--fg-faint);
-  --color-fg-on-accent: #FFFFFF;
+  /* ── Semantic — runtime vars bound in :root / [data-theme=dark] ─────── */
+  --color-bg:            var(--bg);
+  --color-bg-subtle:     var(--bg-subtle);
+  --color-bg-muted:      var(--bg-muted);
+  --color-bg-inset:      var(--bg-inset);
+  --color-fg:            var(--fg);
+  --color-fg-muted:      var(--fg-muted);
+  --color-fg-subtle:     var(--fg-subtle);
+  --color-fg-faint:      var(--fg-faint);
+  --color-fg-on-accent:  #FFFFFF;
   --color-border:        var(--border);
   --color-border-strong: var(--border-strong);
 
-  /* ---------- shadcn aliases (so shadcn components inherit Misir tokens) ---------- */
-  --color-background: var(--bg);
-  --color-foreground: var(--fg);
-  --color-card:       var(--bg);
-  --color-card-foreground: var(--fg);
-  --color-popover:    var(--bg);
-  --color-popover-foreground: var(--fg);
-  --color-primary:    var(--color-accent);
-  --color-primary-foreground: #FFFFFF;
-  --color-secondary:  var(--bg-muted);
-  --color-secondary-foreground: var(--fg);
-  --color-muted:      var(--bg-muted);
-  --color-muted-foreground: var(--fg-muted);
-  --color-destructive: var(--color-danger);
-  --color-destructive-foreground: #FFFFFF;
-  --color-input:      var(--border-strong);
-  --color-ring:       var(--color-accent);
+  /* ── Ring — blue per design system ─────────────────────────────────── */
+  --color-ring: #61AAF2;
 
-  /* ---------- Type scale ---------- */
+  /* ── Type scale ─────────────────────────────────────────────────────── */
   --text-2xs:  11px;
   --text-xs:   12px;
   --text-sm:   13px;
@@ -92,52 +179,50 @@
   --leading-normal:  1.45;
   --leading-relaxed: 1.6;
 
-  --tracking-tight:  -0.02em;
-  --tracking-snug:   -0.01em;
-  --tracking-wide:    0.04em;
-  --tracking-caps:    0.08em;
+  --tracking-tight: -0.02em;
+  --tracking-snug:  -0.01em;
+  --tracking-wide:   0.04em;
+  --tracking-caps:   0.08em;
 
-  /* ---------- Radii ---------- */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
   --radius-pill: 999px;
 
-  /* ---------- Shadows ---------- */
-  --shadow-sm:  0 1px 2px rgba(20, 18, 16, 0.04);
-  --shadow-md:  0 4px 12px rgba(20, 18, 16, 0.06), 0 1px 2px rgba(20, 18, 16, 0.04);
-  --shadow-lg:  0 12px 32px rgba(20, 18, 16, 0.10), 0 2px 6px rgba(20, 18, 16, 0.04);
-  --shadow-pop: 0 18px 48px rgba(20, 18, 16, 0.14);
+  /* ── Shadows ────────────────────────────────────────────────────────── */
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md:      0 4px 12px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-lg:      0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-pop:     0 18px 48px rgba(0, 0, 0, 0.24);
+  --shadow-popover: 0 8px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.16);
+  --shadow-clay:    0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(186, 111, 48, 0.5);
 
-  /* ---------- Easing ---------- */
+  /* ── Easing ─────────────────────────────────────────────────────────── */
   --ease-out:    cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ============================================================
-   Semantic surface vars — live values that switch with theme.
-   Kept OUT of @theme so they aren't frozen at build time.
-   Tailwind utilities like bg-bg / bg-bg-muted read via the
-   alias --color-bg etc. above (which point at these).
-   ============================================================ */
+/* ── Semantic surface vars — switch with theme ────────────────────────── */
 
 :root {
-  --bg:            #FFFFFF;
-  --bg-subtle:     #FAFAF9;
-  --bg-muted:      #F5F4F2;
-  --bg-inset:      #ECEAE6;
-  --bg-hover:      rgba(20, 18, 16, 0.04);
-  --bg-active:     rgba(20, 18, 16, 0.06);
+  /* Light — ivory palette */
+  --bg:        #FAFAF7;
+  --bg-subtle: #F0F0EB;
+  --bg-muted:  #E5E4DF;
+  --bg-inset:  #D8D7D2;
+  --bg-hover:  rgba(25, 25, 25, 0.04);
+  --bg-active: rgba(25, 25, 25, 0.07);
 
-  --fg:            #141210;
-  --fg-muted:      #4F4A45;
-  --fg-subtle:     #908A82;
-  --fg-faint:      #B8B3AC;
+  --fg:        #191919;
+  --fg-muted:  #40403E;
+  --fg-subtle: #666663;
+  --fg-faint:  #91918D;
 
-  --border:        #ECEAE6;
-  --border-strong: #D4D0CA;
+  --border:        rgba(25, 25, 25, 0.10);
+  --border-strong: rgba(25, 25, 25, 0.18);
 
   --dur-fast: 120ms;
   --dur-base: 180ms;
@@ -149,27 +234,26 @@
 }
 
 [data-theme="dark"] {
-  --bg:            #0E0D0B;
-  --bg-subtle:     #141210;
-  --bg-muted:      #1B1916;
-  --bg-inset:      #221F1B;
-  --bg-hover:      rgba(255, 255, 255, 0.04);
-  --bg-active:     rgba(255, 255, 255, 0.06);
+  /* Dark — slate palette */
+  --bg:        #191919;
+  --bg-subtle: #262625;
+  --bg-muted:  #40403E;
+  --bg-inset:  #4A4A48;
+  --bg-hover:  rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(255, 255, 255, 0.07);
 
-  --fg:            #F5F4F2;
-  --fg-muted:      #B8B3AC;
-  --fg-subtle:     #6E6862;
-  --fg-faint:      #4F4A45;
+  --fg:        #F0F0EB;
+  --fg-muted:  #BFBFBA;
+  --fg-subtle: #91918D;
+  --fg-faint:  #666663;
 
-  --border:        #211E1B;
-  --border-strong: #36322E;
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
 
   color-scheme: dark;
 }
 
-/* ============================================================
-   Base resets + typography
-   ============================================================ */
+/* ── Base resets + typography ─────────────────────────────────────────── */
 
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
@@ -189,26 +273,30 @@
   body { overflow: hidden; }
 
   button { font-family: inherit; cursor: pointer; }
-  button:focus-visible {
-    outline: 2px solid var(--color-accent);
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #61AAF2;
     outline-offset: 2px;
     border-radius: 4px;
   }
-  input, textarea { font-family: inherit; color: inherit; }
+
+  input, textarea, select { font-family: inherit; color: inherit; }
 
   ::selection {
-    background: var(--color-accent-soft);
+    background: rgba(217, 119, 87, 0.2);
     color: var(--fg);
   }
 }
 
-/* ============================================================
-   Keyframes used by primitives + Misir-asks
-   ============================================================ */
+/* ── Keyframes ────────────────────────────────────────────────────────── */
 
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(0.7); opacity: 0.4; }
+  50%       { transform: scale(0.7); opacity: 0.4; }
 }
 
 @keyframes typing-bounce {
@@ -221,9 +309,7 @@
   to   { transform: translateY(0); }
 }
 
-/* ============================================================
-   Bottom-sheet variant for shadcn Dialog on mobile
-   ============================================================ */
+/* ── Mobile sheet modal ───────────────────────────────────────────────── */
 
 @media (max-width: 767px) {
   .misir-modal-card[data-variant="sheet"] {

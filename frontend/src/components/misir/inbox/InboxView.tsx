@@ -198,13 +198,13 @@ function InboxRow({
       <div className="flex min-w-0 flex-col gap-1">
         <div
           className={[
-            "text-[13.5px] text-fg",
+            "font-serif text-[13.5px] text-fg",
             conv.unread ? "font-semibold" : "font-medium",
           ].join(" ")}
         >
           {conv.title ?? "Untitled conversation"}
         </div>
-        <div className="line-clamp-1 text-[12.5px] leading-[1.5] text-fg-muted">
+        <div className="line-clamp-1 font-serif text-[12.5px] leading-[1.5] text-fg-muted">
           {snippetFor(conv)}
         </div>
       </div>

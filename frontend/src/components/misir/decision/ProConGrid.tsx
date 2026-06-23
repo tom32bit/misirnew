@@ -43,13 +43,13 @@ function Column({
         >
           <Icon name={icon} size={13} />
         </div>
-        <span className="text-[14px] font-semibold text-fg">{title}</span>
+        <span className="font-display text-[14px] font-medium text-fg">{title}</span>
       </div>
       <ul className="m-0 list-none px-[22px] py-1.5">
         {items.map((t, i) => (
           <li
             key={i}
-            className="flex gap-2.5 border-b border-border py-2.5 text-[13px] leading-[1.55] text-fg-muted last:border-b-0"
+            className="flex gap-2.5 border-b border-border py-2.5 font-serif text-[13px] leading-[1.55] text-fg-muted last:border-b-0"
           >
             <span
               className="mt-[7px] block h-1.5 w-1.5 flex-none rounded-full opacity-55"

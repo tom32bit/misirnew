@@ -65,10 +65,10 @@ export function NudgeCard({
           />
           Misir noticed{space ? ` · ${space.name}` : ""}
         </div>
-        <div className="mt-1 text-[12.5px] leading-[1.5] text-fg-muted">
+        <div className="mt-1 font-serif text-[12.5px] leading-[1.5] text-fg-muted">
           {nudge.scatter}
         </div>
-        <div className="mt-1 text-[14px] font-medium leading-[1.45] text-fg">
+        <div className="mt-1 font-serif text-[14px] font-medium leading-[1.45] text-fg">
           {nudge.direction}
         </div>
         {nudge.consequence && (

@@ -152,51 +152,38 @@ export function InsightList({
             <Link
               key={i}
               href={ins.href}
-              className="grid items-center gap-5 border-b border-border bg-bg px-5 py-5 transition-colors last:border-b-0 hover:bg-[var(--ins-bg)] mobile:grid-cols-[28px_1fr] mobile:gap-y-1.5 mobile:gap-x-2.5 mobile:px-3"
-              style={
-                {
-                  gridTemplateColumns: "36px 130px 1fr auto",
-                  ["--ins-bg" as string]: meta.bg,
-                } as React.CSSProperties
-              }
+              className="flex items-center gap-5 border-b border-border bg-bg px-5 py-4 transition-colors last:border-b-0 hover:bg-[var(--ins-bg)] mobile:flex-col mobile:items-start mobile:gap-2.5 mobile:px-3"
+              style={{ ["--ins-bg" as string]: meta.bg } as React.CSSProperties}
             >
-              <div className="font-mono text-[11px] tracking-wide text-fg-faint mobile:row-start-1 mobile:self-start mobile:pt-0.5">
-                {String(i + 1).padStart(2, "0")}
+              <div className="min-w-0 flex-1">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+                    style={{ color: meta.color }}
+                  >
+                    <Icon name={meta.icon} size={12} />
+                    {meta.label}
+                  </span>
+                  {ins.chips.map((c) => (
+                    <span
+                      key={c.id}
+                      className="inline-flex items-center rounded-sm border px-[7px] py-px text-[10.5px] font-medium"
+                      style={{
+                        color: meta.color,
+                        borderColor: `color-mix(in srgb, ${meta.color} 30%, transparent)`,
+                        background: `color-mix(in srgb, ${meta.color} 7%, transparent)`,
+                      }}
+                    >
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+                <p className="m-0 font-serif text-[14px] italic leading-[1.6] text-fg [text-wrap:pretty]">
+                  {ins.text}
+                </p>
               </div>
-
-              <div className="flex min-w-0 flex-col gap-2 overflow-hidden mobile:row-start-1">
-                <span
-                  className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
-                  style={{ color: meta.color }}
-                >
-                  <Icon name={meta.icon} size={12} />
-                  {meta.label}
-                </span>
-                {ins.chips.length > 0 && (
-                  <div className="flex flex-wrap gap-1 overflow-hidden">
-                    {ins.chips.map((c) => (
-                      <span
-                        key={c.id}
-                        className="inline-flex min-w-0 max-w-full items-center rounded-sm border px-[7px] py-px text-[10.5px] font-medium"
-                        style={{
-                          color: meta.color,
-                          borderColor: `color-mix(in srgb, ${meta.color} 30%, transparent)`,
-                          background: `color-mix(in srgb, ${meta.color} 7%, transparent)`,
-                        }}
-                      >
-                        <span className="truncate">{c.name}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <p className="text-[14.5px] leading-[1.6] text-fg [text-wrap:pretty] mobile:col-span-2 mobile:text-[13px]">
-                {ins.text}
-              </p>
-
               <span
-                className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border bg-transparent px-3.5 py-1.5 text-[12px] font-medium mobile:col-span-2 mobile:justify-self-start"
+                className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border bg-transparent px-3.5 py-1.5 text-[12px] font-medium mobile:self-start"
                 style={{
                   color: meta.color,
                   borderColor: `color-mix(in srgb, ${meta.color} 25%, transparent)`,

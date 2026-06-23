@@ -64,10 +64,10 @@ export function KnowledgeGaps({
             </span>
 
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-[13.5px] font-medium leading-[1.45] text-fg">
+              <div className="font-serif text-[13.5px] font-medium leading-[1.45] text-fg">
                 {g.label}
               </div>
-              <div className="text-[12.5px] leading-[1.5] text-fg-muted">
+              <div className="font-serif text-[12.5px] leading-[1.5] text-fg-muted">
                 {g.action ?? "Open the subspace to investigate."}
               </div>
               {subspace && (

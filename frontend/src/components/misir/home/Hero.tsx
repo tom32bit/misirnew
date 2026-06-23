@@ -162,7 +162,7 @@ function SpaceRingButton({ vm }: { vm: SpaceVM }) {
         trackColor="var(--border-strong)"
       />
       <div className="min-w-0 flex-1">
-        <div className="mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] font-medium text-fg">
+        <div className="mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap font-serif text-[12.5px] font-medium text-fg">
           {vm.space.name}
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide">

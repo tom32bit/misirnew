@@ -118,7 +118,7 @@ function SynthesisCol({
           {label}
         </div>
       </div>
-      <p className="m-0 text-[13px] leading-[1.6] text-fg">{body}</p>
+      <p className="m-0 font-serif text-[13px] leading-[1.6] text-fg">{body}</p>
       {footer}
     </div>
   )
