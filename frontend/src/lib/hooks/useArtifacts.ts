@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useApi } from "../api/client"
 import { artifactsApi, type ListArtifactsOpts } from "../api/artifacts"
 
-export function useArtifacts(opts: ListArtifactsOpts) {
+export function useArtifacts(opts: ListArtifactsOpts, refetchInterval?: number) {
   const k = useApi()
   return useQuery({
     queryKey: ["artifacts", opts],
     queryFn: () => artifactsApi.list(k, opts),
+    refetchInterval,
   })
 }
 

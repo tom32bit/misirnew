@@ -58,11 +58,17 @@ async function syncCache(): Promise<void> {
 
     // subspace_markers not returned by /cache — re-fetch from local or skip
     // (matching works on marker labels; subspace-marker junction only needed for confidence)
-    await Promise.all([
-      db.spaces.bulkPut(spaces),
-      db.subspaces.bulkPut(subspaces),
-      db.markers.bulkPut(markers),
-    ])
+    // Replace the entire local cache atomically — bulkPut only upserts and
+    // leaves deleted backend records behind. clear+bulkAdd inside a transaction
+    // keeps the tables in sync with the backend without a stale-data window.
+    await db.transaction('rw', [db.spaces, db.subspaces, db.markers], async () => {
+      await db.spaces.clear()
+      await db.subspaces.clear()
+      await db.markers.clear()
+      await db.spaces.bulkAdd(spaces)
+      await db.subspaces.bulkAdd(subspaces)
+      await db.markers.bulkAdd(markers)
+    })
 
     log.info(`Cache synced — ${spaces.length} spaces, ${subspaces.length} subspaces, ${markers.length} markers`)
     dbg(`Cache synced — ${spaces.length} spaces, ${subspaces.length} subspaces, ${markers.length} markers`)
@@ -114,6 +120,10 @@ interface ArtifactPayload {
   matched_marker_ids: number[]
   tags: string[]
   metadata: Record<string, unknown>
+  /** ISO UTC timestamp of when the user actually captured this — set client-side
+   *  so offline retries preserve the original capture time rather than using
+   *  server clock at sync time. */
+  captured_at: string
 }
 
 // Backend (CaptureRequest) length caps. Readability returns the full article
@@ -138,6 +148,19 @@ function clampPayload(p: ArtifactPayload): ArtifactPayload {
     }
   }
   return clamped
+}
+
+async function writeSyncStatus(): Promise<void> {
+  try {
+    const pendingCount = await db.pendingArtifacts
+      .filter((a) => !a.syncedAt && (a.syncAttempts ?? 0) < 5)
+      .count()
+    await chrome.storage.local.set({
+      misirSyncStatus: { lastSyncedMs: Date.now(), pendingCount },
+    })
+  } catch {
+    /* best-effort */
+  }
 }
 
 async function pushArtifactToBackend(payload: ArtifactPayload): Promise<number | null> {
@@ -203,6 +226,7 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     return { matched: false }
   }
 
+  const capturedAt = new Date().toISOString()
   const payload: ArtifactPayload = {
     url: msg.url,
     normalized_url: msg.normalizedUrl,
@@ -221,6 +245,7 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     matched_marker_ids: match.matchedMarkerIds,
     tags: [],
     metadata: {},
+    captured_at: capturedAt,
   }
 
   let remoteId: number | null
@@ -233,10 +258,12 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
 
   if (remoteId !== null) {
     await clearConsentNotice()
+    await writeSyncStatus()
     log.success(`Saved "${msg.title}" → ${match.subspace.name} (${(match.confidence * 100).toFixed(0)}%)`)
     dbg(`Saved "${msg.title}" → ${match.subspace.name} (${(match.confidence * 100).toFixed(0)}%)`)
   } else {
-    // Queue locally for retry
+    // Queue locally for retry — store the original capturedAt so retries
+    // don't overwrite it with the server clock at sync time.
     await db.pendingArtifacts.add({
       userId: 'pending',
       spaceId: match.subspace.spaceId,
@@ -257,7 +284,7 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
       decayRate: 'high',
       relevance: match.confidence,
       matchedMarkerIds: match.matchedMarkerIds,
-      capturedAt: new Date(),
+      capturedAt: new Date(capturedAt),
       syncAttempts: 1,
     })
     log.warn(`Queued locally — backend unavailable for "${msg.title}"`)
@@ -300,6 +327,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
     return { matched: false }
   }
 
+  const aiCapturedAt = new Date().toISOString()
   const payload: ArtifactPayload = {
     url: capture.url,
     normalized_url: normalizedUrl,
@@ -321,6 +349,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
       conversationId: capture.conversationId,
       messageCount: capture.messages.length,
     },
+    captured_at: aiCapturedAt,
   }
 
   let remoteId: number | null
@@ -332,6 +361,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
   }
   if (remoteId !== null) {
     await clearConsentNotice()
+    await writeSyncStatus()
     log.success(`AI chat saved: ${capture.platform} "${capture.title}" → ${match.subspace.name}`)
   } else {
     await db.pendingArtifacts.add({
@@ -355,7 +385,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
       relevance: match.confidence,
       matchedMarkerIds: match.matchedMarkerIds,
       metadata: { platform: capture.platform },
-      capturedAt: new Date(),
+      capturedAt: new Date(aiCapturedAt),
       syncAttempts: 1,
     })
     log.warn(`AI chat queued locally: "${capture.title}"`)
@@ -414,6 +444,7 @@ async function retryPending(): Promise<void> {
       matched_marker_ids: artifact.matchedMarkerIds,
       tags: [],
       metadata: (artifact.metadata as Record<string, unknown>) || {},
+      captured_at: artifact.capturedAt.toISOString(),
     }
 
     let remoteId: number | null
@@ -433,6 +464,7 @@ async function retryPending(): Promise<void> {
       await db.pendingArtifacts.update(artifact.id!, { syncAttempts: (artifact.syncAttempts ?? 0) + 1 })
     }
   }
+  await writeSyncStatus()
 }
 
 // ── Message listener ───────────────────────────────────────────────────────
@@ -504,6 +536,29 @@ chrome.runtime.onMessage.addListener(
         ...debugLogs,
       ]
       sendResponse({ logs })
+      return true
+    }
+
+    if (message.type === 'GET_SYNC_STATUS') {
+      db.pendingArtifacts
+        .filter((a) => !a.syncedAt && (a.syncAttempts ?? 0) < 5)
+        .count()
+        .then((pendingCount) => {
+          chrome.storage.local.get('misirSyncStatus', (r) => {
+            sendResponse({
+              lastSyncedMs: r.misirSyncStatus?.lastSyncedMs ?? null,
+              pendingCount,
+            })
+          })
+        })
+        .catch(() => sendResponse({ lastSyncedMs: null, pendingCount: 0 }))
+      return true
+    }
+
+    if (message.type === 'FORCE_SYNC_CACHE') {
+      syncCache()
+        .then(() => sendResponse({ ok: true }))
+        .catch((err: any) => sendResponse({ ok: false, error: err?.message || String(err) }))
       return true
     }
 

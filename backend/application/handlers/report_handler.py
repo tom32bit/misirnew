@@ -34,6 +34,32 @@ from infrastructure.services.supabase_client import get_supabase
 logger = get_logger(__name__)
 settings = get_settings()
 
+
+def _local_midnight(utc_now: datetime, tz_offset_minutes: int) -> datetime:
+    """Return UTC datetime equal to local midnight for the given tz_offset.
+
+    tz_offset_minutes is JS Date.getTimezoneOffset() — positive for timezones
+    behind UTC (UTC-8 → 480), negative for ahead (UTC+6 → -360).
+    """
+    local_now = utc_now + timedelta(minutes=-tz_offset_minutes)
+    local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_midnight + timedelta(minutes=tz_offset_minutes)
+
+
+def _compute_window(period: str, date_str: Optional[str], tz_offset_minutes: int, now: datetime):
+    """Return (since, until) UTC datetimes. until is None for rolling windows."""
+    if date_str:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        since = datetime(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(minutes=tz_offset_minutes)
+        return since, since + timedelta(days=1)
+    elif period == "today":
+        since = _local_midnight(now, tz_offset_minutes)
+        return since, since + timedelta(days=1)
+    elif period == "week":
+        return now - timedelta(days=7), None
+    else:
+        return now - timedelta(days=30), None
+
 # ── Stage B prompts ──────────────────────────────────────────────────────────
 
 MISIR_READ_SYSTEM = """\
@@ -126,7 +152,7 @@ def _extract_ai_chat_insight(extracted_text: str, max_len: int = 280) -> str:
     return extracted_text[:max_len]
 
 
-async def get_dashboard_payload(user_id: str, space_id: int, period: str, db) -> dict:
+async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz_offset: int = 0, date: Optional[str] = None) -> dict:
     """
     Full dashboard payload. One DB call returns everything the four tabs need.
     Backed by Stage A + Stage B caches.
@@ -153,25 +179,23 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db) ->
 
     # ── Period window ────────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
-    if period == "today":
-        since = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == "week":
-        since = now - timedelta(days=7)
-    else:
-        since = now - timedelta(days=30)
+    since, until = _compute_window(period, date, tz_offset, now)
 
     # ── Artifacts for this period ────────────────────────────────────────────
-    arts_row = await aexec(
+    arts_q = (
         db.schema("misir")
         .table("artifact")
         .select("id, title, platform, engagement_level, base_weight, captured_at, content_hash, extracted_text, content_source, word_count, matched_marker_ids")
         .eq("space_id", space_id)
         .gte("captured_at", since.isoformat())
     )
+    if until:
+        arts_q = arts_q.lt("captured_at", until.isoformat())
+    arts_row = await aexec(arts_q)
     artifacts = arts_row.data or []
 
-    # ── Stage A ──────────────────────────────────────────────────────────────
-    stage_a = await run_stage_a(space_id, period, db)
+    # ── Stage A (synthesis) — skipped for custom dates; synthesis is period-scoped ──
+    stage_a = None if date else await run_stage_a(space_id, period, db)
 
     # Auto-create gaps from Stage A open_questions (if not already present)
     if stage_a and stage_a.get("open_questions"):
@@ -402,24 +426,28 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db) ->
     )
 
     # ── Activity timeline ─────────────────────────────────────────────────────
-    activity_arts = await aexec(
+    act_q = (
         db.schema("misir")
         .table("artifact")
         .select("id, title, platform, captured_at")
         .eq("space_id", space_id)
         .gte("captured_at", since.isoformat())
-        .order("captured_at", desc=True)
-        .limit(20)
     )
+    if until:
+        act_q = act_q.lt("captured_at", until.isoformat())
+    activity_arts = await aexec(act_q.order("captured_at", desc=True).limit(20))
 
     # Revisit + crossLink flags
-    open_events = await aexec(
+    open_ev_q = (
         db.schema("misir")
         .table("artifact_open_event")
         .select("artifact_id")
         .eq("user_id", user_id)
         .gte("opened_at", since.isoformat())
     )
+    if until:
+        open_ev_q = open_ev_q.lt("opened_at", until.isoformat())
+    open_events = await aexec(open_ev_q)
     from collections import Counter
     open_counts = Counter(e["artifact_id"] for e in (open_events.data or []))
 

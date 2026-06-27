@@ -19,6 +19,9 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'facebook.com',
   'instagram.com',
   'linkedin.com',
+  // Misir app itself — never capture the dashboard as research content
+  'localhost',
+  'misir.app',
 ]
 
 const STORAGE_KEY = 'blocklist'

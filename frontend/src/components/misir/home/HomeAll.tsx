@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboards } from "@/lib/hooks/useDashboard"
-import type { DashboardPayload, ReportPeriod, Space } from "@/lib/api/types"
+import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
+import type { DashboardPayload, Space } from "@/lib/api/types"
 import {
   countCriticalGaps,
   deriveReadiness,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/api/adapters"
 import { Hero } from "./Hero"
 import { InsightList } from "./InsightList"
-import { SpacePulseStrip } from "./SpacePulseStrip"
 
 /**
  * Build a single dashboard-derived view-model for each space so all
@@ -31,8 +31,7 @@ export type SpaceVM = {
 
 export function HomeAll() {
   const router = useRouter()
-  const sp = useSearchParams()
-  const period = (sp.get("period") ?? "week") as ReportPeriod
+  const { period, date, tzOffset } = usePeriodParams()
   const { user } = useUser()
   const { data: spaces = [], isLoading } = useSpaces()
   useEffect(() => {
@@ -43,6 +42,8 @@ export function HomeAll() {
   const dashboards = useDashboards(
     spaces.map((s) => s.id),
     period,
+    tzOffset,
+    date,
   )
 
   const vms: SpaceVM[] = spaces.map((space, i) => {
@@ -72,7 +73,6 @@ export function HomeAll() {
         totalCritical={totalCritical}
       />
       <InsightList vms={vms} period={period} />
-      <SpacePulseStrip vms={vms} />
     </>
   )
 }

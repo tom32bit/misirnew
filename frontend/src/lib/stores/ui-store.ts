@@ -6,6 +6,7 @@ export type ModalState =
   | null
   | { kind: "new-space" }
   | { kind: "new-chat"; defaultSpaceId?: number }
+  | { kind: "edit-space"; spaceId: number }
 
 type MisirAsksState = {
   expanded: boolean

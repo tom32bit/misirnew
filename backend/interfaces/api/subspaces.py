@@ -30,8 +30,13 @@ def list_subspaces(space_id: int, current_user: CurrentUser = Depends(get_curren
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id)
     _assert_space_owned(db, space_id, user_id)
-    rows = db.schema("misir").table("subspace").select("*").eq("space_id", space_id).execute()
-    return rows.data or []
+    rows = db.schema("misir").table("subspace").select("*, subspace_marker(marker_id)").eq("space_id", space_id).execute()
+    result = []
+    for row in (rows.data or []):
+        marker_rows = row.pop("subspace_marker", []) or []
+        row["marker_ids"] = [m["marker_id"] for m in marker_rows]
+        result.append(row)
+    return result
 
 
 @router.post("/spaces/{space_id}/subspaces", status_code=201)

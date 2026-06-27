@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from auth.clerk import CurrentUser, get_current_user
 from core.config import get_settings
 from core.limiter import limiter
+from core.logging_config import get_logger
 from domain.entities.common import EngagementLevel, PlatformType
 from infrastructure.jobs.queue import enqueue
 from infrastructure.services import consent_service
@@ -28,6 +29,41 @@ from interfaces.api.spaces import _resolve_user_id
 
 router = APIRouter(tags=["artifacts"])
 _settings = get_settings()
+_log = get_logger(__name__)
+
+
+def _local_midnight(utc_now, tz_offset_minutes: int):
+    """Return UTC datetime equal to local midnight for the given tz_offset.
+
+    tz_offset_minutes is JS Date.getTimezoneOffset() — positive for timezones
+    behind UTC (UTC-8 → 480), negative for ahead (UTC+6 → -360).
+    """
+    from datetime import timedelta
+    local_now = utc_now + timedelta(minutes=-tz_offset_minutes)
+    local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_midnight + timedelta(minutes=tz_offset_minutes)
+
+
+def _compute_window(period: str, date_str, tz_offset_minutes: int, now):
+    """Return (since, until) UTC datetimes for the given period or specific date.
+
+    until is None for rolling windows (week/month) — open-ended upper bound.
+    For date_str or period="today", until = start of the following local day.
+    """
+    from datetime import datetime as _dt, timedelta, timezone
+    if date_str:
+        d = _dt.strptime(date_str, "%Y-%m-%d")
+        since = _dt(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(minutes=tz_offset_minutes)
+        return since, since + timedelta(days=1)
+    elif period == "today":
+        since = _local_midnight(now, tz_offset_minutes)
+        return since, since + timedelta(days=1)
+    elif period == "week":
+        return now - timedelta(days=7), None
+    elif period == "month":
+        return now - timedelta(days=30), None
+    else:
+        return now - timedelta(days=7), None
 
 
 # ── Request / response models ─────────────────────────────────────────────────
@@ -51,6 +87,10 @@ class CaptureRequest(BaseModel):
     matched_marker_ids: List[int] = Field(default_factory=list, max_length=500)
     tags: List[str] = Field(default_factory=list, max_length=100)
     metadata: dict = {}
+    # Client-supplied ISO UTC timestamp — preserves the actual capture moment for
+    # offline retries (which would otherwise land with the server's retry time).
+    # Falls back to server time if omitted (old extension versions).
+    captured_at: Optional[str] = None
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -97,13 +137,20 @@ def capture_artifact(
     if space_id is not None:
         owned = db.schema("misir").table("space").select("id").eq("id", space_id).eq("user_id", user_id).execute()
         if not owned.data:
+            _log.warning("capture_artifact space_not_found", space_id=space_id, user_id=user_id)
             space_id = None
 
     base_weight = body.engagement_level.base_weight
 
+    from datetime import datetime, timezone
+    # Use client-supplied timestamp when available (preserves offline capture
+    # time through retries). Fall back to server clock only for old clients.
+    captured_now = body.captured_at or datetime.now(timezone.utc).isoformat()
+
     artifact_data = {
         "user_id": user_id,
         "space_id": space_id,
+        "captured_at": captured_now,
         "url": body.url,
         "normalized_url": body.normalized_url,
         "domain": body.domain,
@@ -122,15 +169,27 @@ def capture_artifact(
         "metadata": body.metadata,
     }
 
-    # Upsert by (user_id, normalized_url)
-    row = (
+    # Check if this URL was already captured by the user.
+    # On re-capture: update content/engagement fields but NEVER overwrite
+    # captured_at — the original capture date must stay intact so the
+    # TodayTimeline doesn't show old articles as new captures.
+    existing = (
         db.schema("misir")
         .table("artifact")
-        .upsert(artifact_data, on_conflict="user_id,normalized_url")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("normalized_url", body.normalized_url)
         .execute()
     )
-    artifact = row.data[0]
-    artifact_id = artifact["id"]
+    if existing.data:
+        artifact_id = existing.data[0]["id"]
+        update_data = {k: v for k, v in artifact_data.items() if k != "captured_at"}
+        db.schema("misir").table("artifact").update(update_data).eq("id", artifact_id).execute()
+        artifact = {"id": artifact_id, **artifact_data}
+    else:
+        row = db.schema("misir").table("artifact").insert(artifact_data).execute()
+        artifact = row.data[0]
+        artifact_id = artifact["id"]
 
     # Insert open event
     db.schema("misir").table("artifact_open_event").insert({
@@ -251,6 +310,8 @@ def list_artifacts(
     tag: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     period: Optional[str] = Query("week"),
+    date: Optional[str] = Query(None),
+    tz_offset: int = Query(0),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     current_user: CurrentUser = Depends(get_current_user),
@@ -258,11 +319,19 @@ def list_artifacts(
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id)
 
-    # Build base query
+    # Build base query — exclude extracted_text and content_embedding (large fields
+    # not needed by the UI; including them in limit=200 calls caused HTTP/2 Server
+    # disconnected errors due to multi-MB response payloads).
     query = (
         db.schema("misir")
         .table("artifact")
-        .select("*, artifact_tag(tag), artifact_open_event(count)")
+        .select(
+            "id,user_id,space_id,url,normalized_url,domain,title,"
+            "content_hash,word_count,content_source,platform,engagement_level,"
+            "dwell_time_ms,scroll_depth,reading_depth,base_weight,"
+            "matched_marker_ids,metadata,captured_at,updated_at,"
+            "artifact_tag(tag),artifact_open_event(count)"
+        )
         .eq("user_id", user_id)
     )
 
@@ -271,18 +340,13 @@ def list_artifacts(
     if platform:
         query = query.eq("platform", platform)
 
-    # Period filter
-    from datetime import datetime, timedelta, timezone
+    # Period / date filter
+    from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    if period == "today":
-        since = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == "week":
-        since = now - timedelta(days=7)
-    elif period == "month":
-        since = now - timedelta(days=30)
-    else:
-        since = now - timedelta(days=7)
+    since, until = _compute_window(period or "week", date, tz_offset, now)
     query = query.gte("captured_at", since.isoformat())
+    if until:
+        query = query.lt("captured_at", until.isoformat())
 
     if q:
         # Text search on title + extracted_text (Supabase full-text search)

@@ -1,16 +1,15 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useSearchParams } from "next/navigation"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { SectionHead } from "@/components/misir/primitives/Card"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboard } from "@/lib/hooks/useDashboard"
+import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import type {
   DashboardSource,
   PlatformType,
-  ReportPeriod,
   Space,
 } from "@/lib/api/types"
 import { TensionTable } from "./TensionTable"
@@ -93,8 +92,7 @@ function keyLabel(k: SourceKey): string {
 
 export function ComparisonView({ scope }: { scope: Scope }) {
   const isAll = scope === "all"
-  const sp = useSearchParams()
-  const period = (sp.get("period") ?? "week") as ReportPeriod
+  const { period, date, tzOffset } = usePeriodParams()
 
   const { data: spaces = [] } = useSpaces()
   const [activeSpaceId, setActiveSpaceId] = useState<number | null>(
@@ -106,7 +104,7 @@ export function ComparisonView({ scope }: { scope: Scope }) {
     ? activeSpaceId ?? spaces[0]?.id ?? null
     : (scope as number)
 
-  const dashboard = useDashboard(effectiveSpaceId, period)
+  const dashboard = useDashboard(effectiveSpaceId, period, tzOffset, date)
   const payload = dashboard.data
   const sources = useMemo(
     () => aggregateSources(payload?.sources ?? []),

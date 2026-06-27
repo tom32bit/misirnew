@@ -25,13 +25,6 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
-        {/* Fira Code — only font loaded remotely */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
         <Script id="misir-theme-bootstrap" strategy="beforeInteractive">
           {themeBootstrap}
         </Script>

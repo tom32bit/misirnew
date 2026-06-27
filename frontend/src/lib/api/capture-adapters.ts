@@ -9,11 +9,34 @@ import type {
   DashboardSubspaceStat,
   Subspace,
 } from "./types"
+
 import {
   captureType,
   surfaceIcon,
   surfaceLabel,
 } from "@/lib/constants/surface-icons"
+
+/** Best-match subspace for an artifact based on matched_marker_ids overlap. */
+function resolveSubspaceId(
+  matchedMarkerIds: number[] | null | undefined,
+  subspaces: Subspace[],
+): number | null {
+  if (!matchedMarkerIds || matchedMarkerIds.length === 0) return null
+  const aSet = new Set(matchedMarkerIds)
+  let bestId: number | null = null
+  let bestScore = 0
+  for (const s of subspaces) {
+    if (!s.marker_ids || s.marker_ids.length === 0) continue
+    const overlap = s.marker_ids.filter((m) => aSet.has(m)).length
+    const score = overlap / s.marker_ids.length
+    if (score > bestScore) {
+      bestScore = score
+      bestId = s.id
+    }
+  }
+  // Require at least 30% overlap to count (keeps unrelated subspaces out).
+  return bestScore >= 0.3 ? bestId : null
+}
 
 export type CaptureVM = {
   id: string
@@ -69,12 +92,19 @@ function markerLabel(a: Artifact): string {
   return a.artifact_tag?.[0]?.tag ?? ""
 }
 
-export function adaptCapture(a: Artifact, now = new Date()): CaptureVM {
+export function adaptCapture(
+  a: Artifact,
+  now = new Date(),
+  subspaces: Subspace[] = [],
+): CaptureVM {
   const captured = new Date(a.captured_at)
-  const subspaceFromMeta =
+  // Prefer metadata.subspace_id (legacy) then marker-based best-match.
+  const metaSubspace =
     typeof (a.metadata as Record<string, unknown> | null)?.subspace_id === "number"
       ? ((a.metadata as Record<string, unknown>).subspace_id as number)
       : null
+  const subspaceId =
+    metaSubspace ?? resolveSubspaceId(a.matched_marker_ids, subspaces)
   const revisitCount = a.artifact_open_event?.[0]?.count ?? 0
   const revisit = revisitCount > 1 ? revisitCount - 1 : undefined
 
@@ -89,13 +119,17 @@ export function adaptCapture(a: Artifact, now = new Date()): CaptureVM {
     title: a.title ?? a.url,
     marker: markerLabel(a),
     spaceId: a.space_id,
-    subspaceId: subspaceFromMeta,
+    subspaceId,
     revisit,
   }
 }
 
-export function adaptCaptures(artifacts: Artifact[], now = new Date()): CaptureVM[] {
-  return artifacts.map((a) => adaptCapture(a, now))
+export function adaptCaptures(
+  artifacts: Artifact[],
+  now = new Date(),
+  subspaces: Subspace[] = [],
+): CaptureVM[] {
+  return artifacts.map((a) => adaptCapture(a, now, subspaces))
 }
 
 export type SubspaceVM = {
@@ -135,6 +169,7 @@ export function adaptSubspaces(
   depth?: DashboardPayload["research_depth"],
   stats?: DashboardSubspaceStat[],
   now = new Date(),
+  period: "today" | "week" | "month" | "all" = "week",
 ): SubspaceVM[] {
   const nowMs = now.getTime()
   const weekMs = 7 * 24 * 60 * 60 * 1000
@@ -161,10 +196,16 @@ export function adaptSubspaces(
       .sort((a, b) => b - a)
 
     const last7 = owned.filter((a) => nowMs - Date.parse(a.captured_at) <= weekMs).length
-    const prior7 = owned.filter((a) => {
-      const t = Date.parse(a.captured_at)
-      return nowMs - t > weekMs && nowMs - t <= 2 * weekMs
-    }).length
+    // prior7 is only meaningful when the artifact window covers at least 14d
+    // (month view). On week/today views, the array stops at 7d so prior7 is
+    // always 0, making the delta misleadingly positive.
+    const prior7 =
+      period === "month"
+        ? owned.filter((a) => {
+            const t = Date.parse(a.captured_at)
+            return nowMs - t > weekMs && nowMs - t <= 2 * weekMs
+          }).length
+        : 0
 
     const captures = stat?.captures ?? owned.length
     const completeness = Math.max(

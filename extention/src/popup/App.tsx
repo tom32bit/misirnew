@@ -17,6 +17,20 @@ interface EngagementState {
   url: string
 }
 
+interface SyncStatus {
+  lastSyncedMs: number | null
+  pendingCount: number
+}
+
+function fmtTimeAgo(ms: number): string {
+  const diffS = Math.floor((Date.now() - ms) / 1000)
+  if (diffS < 60) return 'just now'
+  const diffM = Math.floor(diffS / 60)
+  if (diffM < 60) return `${diffM}m ago`
+  const diffH = Math.floor(diffM / 60)
+  return `${diffH}h ago`
+}
+
 function fmtDwell(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   const s = Math.floor(ms / 1000)
@@ -32,6 +46,7 @@ export default function PopupApp() {
   const [showLogs, setShowLogs] = useState(false)
   const [engagement, setEngagement] = useState<EngagementState | null>(null)
   const [needsOptIn, setNeedsOptIn] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
 
   // Show an opt-in notice whenever the user hasn't enabled any capture, or the
   // backend reported that consent is required.
@@ -59,6 +74,10 @@ export default function PopupApp() {
           if (chrome.runtime.lastError) return
           if (response) setEngagement(response)
         })
+      })
+      chrome.runtime.sendMessage({ type: 'GET_SYNC_STATUS' }, (response: any) => {
+        if (chrome.runtime.lastError) return
+        if (response) setSyncStatus(response)
       })
     }, 1000)
     return () => clearInterval(interval)
@@ -185,6 +204,29 @@ export default function PopupApp() {
           <p className="text-xs text-muted-foreground">No tracked page active</p>
         </div>
       )}
+
+      {/* Sync Status */}
+      <div className="flex items-center justify-between px-3 py-2 border-b">
+        <span className="text-xs text-muted-foreground">Sync</span>
+        <span className="text-xs font-mono flex items-center gap-1.5">
+          {syncStatus ? (
+            syncStatus.pendingCount > 0 ? (
+              <span className="text-yellow-600 dark:text-yellow-400">
+                {syncStatus.pendingCount} pending
+              </span>
+            ) : (
+              <span className="text-green-600 dark:text-green-400">Up to date</span>
+            )
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+          {syncStatus?.lastSyncedMs && (
+            <span className="text-muted-foreground">
+              · {fmtTimeAgo(syncStatus.lastSyncedMs)}
+            </span>
+          )}
+        </span>
+      </div>
 
       {/* Debug Logs — unchanged */}
       {showLogs && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
 import type { Space, Subspace, Marker } from '@/types'
 
@@ -10,10 +10,14 @@ interface DBStatus {
   subspaces: Subspace[]
   markers: Marker[]
   error: string | null
+  reload: () => void
 }
 
 export function useDBStatus() {
-  const [status, setStatus] = useState<DBStatus>({
+  const [reloadKey, setReloadKey] = useState(0)
+  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  const [status, setStatus] = useState<Omit<DBStatus, 'reload'>>({
     spacesLoading: true,
     subspacesLoading: true,
     markersLoading: true,
@@ -79,7 +83,7 @@ export function useDBStatus() {
     // Refresh every 30 seconds
     const interval = setInterval(loadData, 30_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [reloadKey])
 
-  return status
+  return { ...status, reload }
 }

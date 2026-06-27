@@ -21,6 +21,8 @@ async def get_dashboard(
     request: Request,
     space_id: int,
     period: str = Query("week", regex="^(today|week|month)$"),
+    date: str = Query(None),
+    tz_offset: int = Query(0),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """
@@ -35,7 +37,7 @@ async def get_dashboard(
     _assert_space_owned(db, space_id, user_id)
 
     from application.handlers.report_handler import get_dashboard_payload
-    return await get_dashboard_payload(user_id=user_id, space_id=space_id, period=period, db=db)
+    return await get_dashboard_payload(user_id=user_id, space_id=space_id, period=period, date=date, tz_offset=tz_offset, db=db)
 
 
 @router.post("/reports/regenerate", status_code=202)

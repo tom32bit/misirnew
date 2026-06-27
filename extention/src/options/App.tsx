@@ -6,12 +6,14 @@ import { useBlocklist } from '@/hooks/useBlocklist'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, CheckCircle, AlertCircle, Loader2, XCircle, ChevronDown, ChevronUp, X, Download, Upload } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, Loader2, XCircle, ChevronDown, ChevronUp, X, Download, Upload, RefreshCw } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
 export default function SettingsApp() {
   const { user, loading, signOut } = useAuth()
   const dbStatus = useDBStatus()
+  const [cacheRefreshing, setCacheRefreshing] = useState(false)
+  const [cacheRefreshResult, setCacheRefreshResult] = useState<'ok' | 'error' | null>(null)
   const libraryStatus = useLibraryStatus()
   const { list: blocklist, add: addBlocked, remove: removeBlocked, reset: resetBlocklist, defaults: defaultBlocklist, setList: setBlocklist } = useBlocklist()
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
@@ -51,6 +53,21 @@ export default function SettingsApp() {
       { purpose: 'web_capture', granted: next.webCapture },
       { purpose: 'ai_chat_capture', granted: next.aiChatCapture },
     ]).catch(() => {})
+  }
+
+  function forceRefreshCache() {
+    setCacheRefreshing(true)
+    setCacheRefreshResult(null)
+    chrome.runtime.sendMessage({ type: 'FORCE_SYNC_CACHE' }, (response: any) => {
+      setCacheRefreshing(false)
+      if (response?.ok) {
+        setCacheRefreshResult('ok')
+        dbStatus.reload()
+      } else {
+        setCacheRefreshResult('error')
+      }
+      setTimeout(() => setCacheRefreshResult(null), 3000)
+    })
   }
 
   function exportBlocklist() {
@@ -314,8 +331,29 @@ export default function SettingsApp() {
           {/* Database Status */}
           <Card>
             <CardHeader>
-              <CardTitle>Database Status</CardTitle>
-              <CardDescription>Local cache synchronization status</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Database Status</CardTitle>
+                  <CardDescription>Local cache synchronization status</CardDescription>
+                </div>
+                <button
+                  onClick={forceRefreshCache}
+                  disabled={cacheRefreshing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Force-refresh cached spaces, subspaces and markers from the backend"
+                >
+                  {cacheRefreshing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : cacheRefreshResult === 'ok' ? (
+                    <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                  ) : cacheRefreshResult === 'error' ? (
+                    <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  {cacheRefreshing ? 'Refreshing…' : cacheRefreshResult === 'ok' ? 'Refreshed' : cacheRefreshResult === 'error' ? 'Failed' : 'Refresh cache'}
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/50">

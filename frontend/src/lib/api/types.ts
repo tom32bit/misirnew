@@ -27,6 +27,8 @@ export type Subspace = {
   description: string | null
   created_at: string
   updated_at: string
+  /** Populated by the list endpoint via subspace_marker join. */
+  marker_ids?: number[]
 }
 
 export type Marker = {

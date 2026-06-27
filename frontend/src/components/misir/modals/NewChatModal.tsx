@@ -120,10 +120,10 @@ export function NewChatModal({
                     type="button"
                     onClick={() => setSpaceId(s.id)}
                     className={[
-                      "inline-flex h-7 items-center gap-1.5 rounded-pill border bg-bg px-3 text-[12.5px] transition-colors cursor-pointer",
+                      "inline-flex h-7 items-center gap-1.5 rounded-pill border px-3 text-[12.5px] transition-colors cursor-pointer",
                       active
                         ? "border-accent bg-accent text-fg-on-accent"
-                        : "border-border-strong text-fg-muted hover:bg-bg-muted hover:text-fg",
+                        : "border-border-strong bg-bg text-fg-muted hover:bg-bg-muted hover:text-fg",
                     ].join(" ")}
                   >
                     <Icon name="target" size={12} />

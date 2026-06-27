@@ -7,6 +7,10 @@ export type ListArtifactsOpts = {
   tag?: string
   q?: string
   period?: ReportPeriod | "all"
+  /** Specific date "yyyy-MM-dd" — overrides period for data fetching. */
+  date?: string
+  /** JS Date.getTimezoneOffset() — used with period="today" or date. */
+  tzOffset?: number
   limit?: number
   offset?: number
 }
@@ -22,6 +26,8 @@ export const artifactsApi = {
     if (opts.tag) searchParams.tag = opts.tag
     if (opts.q) searchParams.q = opts.q
     if (opts.period && opts.period !== "all") searchParams.period = opts.period
+    if (opts.date) searchParams.date = opts.date
+    if ((opts.period === "today" || opts.date) && opts.tzOffset != null) searchParams.tz_offset = opts.tzOffset
     return k.get("artifacts", { searchParams }).json<Artifact[]>()
   },
 
