@@ -174,6 +174,37 @@ async def _verify_clerk_jwt(token: str) -> CurrentUser:
 # FastAPI dependency
 # ---------------------------------------------------------------------------
 
+async def fetch_clerk_email(clerk_user_id: str) -> str:
+    """Look up a user's primary email via the Clerk Backend API.
+
+    Session tokens often omit the email claim; this fetches it from Clerk (the
+    source of truth) so the account UI can show it. Requires CLERK_SECRET_KEY;
+    returns "" when unset or on any error. Never raises.
+    """
+    settings = get_settings()
+    if not settings.CLERK_SECRET_KEY:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"https://api.clerk.com/v1/users/{clerk_user_id}",
+                headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+            )
+            if resp.status_code != 200:
+                return ""
+            data = resp.json()
+            primary_id = data.get("primary_email_address_id")
+            for addr in data.get("email_addresses", []):
+                if addr.get("id") == primary_id:
+                    return addr.get("email_address", "") or ""
+            # Fall back to the first address if no primary is flagged.
+            addrs = data.get("email_addresses", [])
+            return addrs[0].get("email_address", "") if addrs else ""
+    except Exception as exc:
+        logger.error("Clerk email lookup failed", error=str(exc))
+        return ""
+
+
 async def delete_clerk_user(clerk_user_id: str) -> bool:
     """Best-effort deletion of the Clerk identity via the Backend API.
 

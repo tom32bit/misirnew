@@ -289,15 +289,31 @@ def get_cache(current_user: CurrentUser = Depends(get_current_user)):
     spaces = db.schema("misir").table("space").select("*").eq("user_id", user_id).execute()
     space_ids = [s["id"] for s in (spaces.data or [])]
 
-    subspaces, markers = [], []
+    subspaces_data, markers_data, subspace_markers_data = [], [], []
     if space_ids:
         subspaces = db.schema("misir").table("subspace").select("*").in_("space_id", space_ids).execute()
         markers = db.schema("misir").table("marker").select("*").in_("space_id", space_ids).execute()
+        subspaces_data = subspaces.data or []
+        markers_data = markers.data or []
+        # The subspace→marker junction lets the extension match each subspace on
+        # its OWN markers instead of the whole space's — so distinct subspaces
+        # (e.g. "guava beverages" vs "common guava varieties") match correctly.
+        subspace_ids = [s["id"] for s in subspaces_data]
+        if subspace_ids:
+            sm = (
+                db.schema("misir")
+                .table("subspace_marker")
+                .select("subspace_id, marker_id")
+                .in_("subspace_id", subspace_ids)
+                .execute()
+            )
+            subspace_markers_data = sm.data or []
 
     return {
         "spaces": spaces.data or [],
-        "subspaces": subspaces.data if space_ids else [],
-        "markers": markers.data if space_ids else [],
+        "subspaces": subspaces_data,
+        "markers": markers_data,
+        "subspace_markers": subspace_markers_data,
     }
 
 

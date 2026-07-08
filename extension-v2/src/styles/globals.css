@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Claude dark design system (from design_handoff_claude_dark).
+   shadcn tokens are HSL triples (tailwind wraps them as hsl(...));
+   the --m-* tokens are direct colors for bespoke inline styles.
+   ============================================================ */
+@layer base {
+  :root {
+    /* shadcn semantic tokens — dark */
+    --background: 60 2% 15%;        /* slate-medium #262625 */
+    --foreground: 0 0% 100%;
+    --card: 60 2% 18%;
+    --card-foreground: 0 0% 98%;
+    --popover: 60 2% 18%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 15 63% 60%;          /* Claude clay #D97757 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 2% 24%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 60 2% 22%;
+    --muted-foreground: 50 4% 68%;  /* cloud text */
+    --accent: 60 2% 24%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 5 48% 51%;       /* state-error #BF4D43 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 2% 25%;
+    --input: 60 2% 25%;
+    --ring: 15 63% 60%;
+    --radius: 0.5rem;
+
+    /* direct-color Claude palette (use in inline styles) */
+    --m-app: #262625;
+    --m-sunken: #191919;
+    --m-raised: #302F2D;
+    --m-hover: rgba(255, 255, 255, 0.05);
+    --m-text: #ffffff;
+    --m-text-2: #bfbfba;
+    --m-text-3: #91918d;
+    --m-accent: #d97757;
+    --m-accent-soft: rgba(217, 119, 87, 0.14);
+    --m-border: rgba(255, 255, 255, 0.10);
+    --m-border-strong: #40403e;
+    --m-danger: #bf4d43;
+    --m-danger-soft: rgba(191, 77, 67, 0.14);
+    --m-shadow: 0 8px 30px -6px rgba(0, 0, 0, 0.5);
+
+    --font-sans: "Styrene B LC", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-display: "Copernicus", "Tiempos Text", "Newsreader", Georgia, "Times New Roman", serif;
+    --font-mono: "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

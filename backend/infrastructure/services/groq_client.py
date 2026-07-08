@@ -36,10 +36,17 @@ def _estimate_prompt_tokens(messages: list[dict[str, Any]]) -> int:
 
 
 class GroqClient:
-    def __init__(self, api_key: str, limiter: GroqRateLimiter, default_model: str) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        limiter: GroqRateLimiter,
+        default_model: str,
+        reasoning_format: str = "",
+    ) -> None:
         self._client = AsyncGroq(api_key=api_key) if api_key else None
         self._limiter = limiter
         self._default_model = default_model
+        self._reasoning_format = reasoning_format
 
     @property
     def is_available(self) -> bool:
@@ -48,6 +55,30 @@ class GroqClient:
     @property
     def default_model(self) -> str:
         return self._default_model
+
+    def _build_params(
+        self, model: str, base: dict[str, Any], extra: Optional[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Assemble the request params, merging any caller `extra`.
+
+        Reasoning models (Qwen3) emit chain-of-thought that pollutes JSON/prose
+        outputs. `reasoning_format` suppresses it, but it isn't a named argument
+        in the Groq SDK — passing it directly raises TypeError — so it must ride
+        in `extra_body` to reach the API. Only sent to Qwen so switching back to
+        a non-reasoning model (Llama) won't 400."""
+        params = dict(base)
+        extra_body: dict[str, Any] = {}
+        if self._reasoning_format and "qwen" in model.lower():
+            extra_body["reasoning_format"] = self._reasoning_format
+        if extra:
+            for key, value in extra.items():
+                if key == "extra_body" and isinstance(value, dict):
+                    extra_body.update(value)
+                else:
+                    params[key] = value
+        if extra_body:
+            params["extra_body"] = extra_body
+        return params
 
     async def chat_completion(
         self,
@@ -63,14 +94,17 @@ class GroqClient:
             raise RuntimeError("Groq client not configured (GROQ_API_KEY missing)")
         estimated = _estimate_prompt_tokens(messages) + max_tokens
         await self._limiter.acquire(estimated, priority=priority)
-        params: dict[str, Any] = {
-            "model": model or self._default_model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
-        if extra:
-            params.update(extra)
+        effective_model = model or self._default_model
+        params = self._build_params(
+            effective_model,
+            {
+                "model": effective_model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            },
+            extra,
+        )
         response = await self._client.chat.completions.create(**params)
         if getattr(response, "usage", None) is not None:
             self._limiter.record_actual_usage(actual_tokens=response.usage.total_tokens, estimated=estimated)
@@ -90,15 +124,18 @@ class GroqClient:
             raise RuntimeError("Groq client not configured (GROQ_API_KEY missing)")
         estimated = _estimate_prompt_tokens(messages) + max_tokens
         await self._limiter.acquire(estimated, priority=priority)
-        params: dict[str, Any] = {
-            "model": model or self._default_model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": True,
-        }
-        if extra:
-            params.update(extra)
+        effective_model = model or self._default_model
+        params = self._build_params(
+            effective_model,
+            {
+                "model": effective_model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "stream": True,
+            },
+            extra,
+        )
         stream = await self._client.chat.completions.create(**params)
         final_usage = None
         async for chunk in stream:
@@ -113,4 +150,9 @@ class GroqClient:
 @lru_cache(maxsize=1)
 def get_groq_client() -> GroqClient:
     s = get_settings()
-    return GroqClient(api_key=s.GROQ_API_KEY, limiter=get_groq_rate_limiter(), default_model=s.LLM_MODEL)
+    return GroqClient(
+        api_key=s.GROQ_API_KEY,
+        limiter=get_groq_rate_limiter(),
+        default_model=s.LLM_MODEL,
+        reasoning_format=s.GROQ_REASONING_FORMAT,
+    )

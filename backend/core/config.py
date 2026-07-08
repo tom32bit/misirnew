@@ -54,7 +54,11 @@ class Settings(BaseSettings):
 
     # Groq
     GROQ_API_KEY: str = ""
-    LLM_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    LLM_MODEL: str = "qwen/qwen3-32b"
+    # Reasoning models (Qwen3) emit <think> chain-of-thought. "hidden" drops it
+    # so responses stay clean; only sent to Qwen models (see GroqClient). Empty
+    # to disable (e.g. when reverting to a non-reasoning model like Llama).
+    GROQ_REASONING_FORMAT: str = "hidden"
     LLM_MAX_TOKENS: int = 1024
     GROQ_TPM_LIMIT: int = 30000
     GROQ_RPM_LIMIT: int = 30
