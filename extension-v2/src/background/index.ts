@@ -379,10 +379,8 @@ async function handlePreviewMatch(text: string): Promise<CaptureResultMessage> {
   if (subspacesWithMarkers.length === 0) return { matched: false }
 
   const nlpResult = processText(text)
-  log.debug('Match preview — subspace scores:')
-  const match = findBestMatch(text, nlpResult, subspacesWithMarkers, (m) => log.debug(m))
+  const match = findBestMatch(text, nlpResult, subspacesWithMarkers)
   if (!match) return { matched: false }
-  log.debug(`→ picked ${match.subspace.name} (${(match.confidence * 100).toFixed(0)}%)`)
 
   return {
     matched: true,
