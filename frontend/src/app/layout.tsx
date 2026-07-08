@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Script from "next/script"
 import { Providers } from "./providers"
 import { ConsentBanner } from "@/components/privacy/ConsentBanner"
+import { DevGate } from "@/components/DevGate"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -30,10 +31,12 @@ export default function RootLayout({
         </Script>
       </head>
       <body>
-        <Providers>
-          {children}
-          <ConsentBanner />
-        </Providers>
+        <DevGate>
+          <Providers>
+            {children}
+            <ConsentBanner />
+          </Providers>
+        </DevGate>
       </body>
     </html>
   )
