@@ -7,7 +7,7 @@
     "copy:ort": "node scripts/copy-ort.mjs",
     "dev": "npm run copy:ort && vite",
     "prebuild": "npm run copy:ort",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/trim-ort.mjs",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx",
     "postinstall": "npm run copy:ort"

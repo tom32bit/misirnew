@@ -389,11 +389,12 @@ if (document.readyState !== 'complete') {
   }, { once: true })
 }
 
-// Re-check the match when the tab regains focus (spaces may have synced, or the
-// user continued the conversation in another tab).
+// Re-check the match when the tab regains focus (the user may have continued
+// the conversation in another tab). We deliberately DON'T reset lastPreviewHash
+// here: if the visible text is unchanged, refreshPreview's hash guard skips the
+// round-trip, so a focus flap costs nothing. Only genuinely new content re-runs.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && currentMode) {
-    lastPreviewHash = null
     schedulePreview(400)
   }
 })

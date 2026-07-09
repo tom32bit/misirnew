@@ -20,11 +20,21 @@ const TIEBREAK_EPSILON = 0.01
 const MATCH_THRESHOLD = 0.35
 
 // When semantic (on-device embedding) scores are supplied, topic similarity
-// leads and keyword coverage refines it: combined = 0.6·semantic + 0.4·keyword.
-// A candidate must also clear SEMANTIC_FLOOR — this is what stops a strong
-// keyword hit on an off-topic page (e.g. "roi" markers matching a page that
-// merely mentions the word) from being saved to the wrong space.
-const SEMANTIC_WEIGHT = 0.6
+// leads and keyword coverage refines it: combined = w·semantic + (1-w)·keyword.
+//
+// Stage 1 (space): keyword coverage of a space's markers is a strong, meaningful
+// space signal, so it gets real weight (0.4).
+//
+// Stage 2 (subspace): the candidates are already all in the right space, so
+// they're all on-topic and their semantic scores sit close together. Here a
+// stray keyword hit (e.g. a caffeine article mentioning "water"/"mg" lighting up
+// the "Water Quality" subspace) is mostly noise, so keyword is demoted to a
+// light tie-breaker and topic similarity dominates.
+const SPACE_SEMANTIC_WEIGHT = 0.6
+const SUBSPACE_SEMANTIC_WEIGHT = 0.8
+
+// A candidate space must clear this floor — stops a page that resembles no space
+// from being saved anywhere (off-topic keyword collisions, blank pages).
 const SEMANTIC_FLOOR = 0.45
 
 export interface MatchOptions {
@@ -97,7 +107,7 @@ export function findBestMatch(
     const meanSem = sems.reduce((a, b) => a + b, 0) / (sems.length || 1)
     const semSpace = useSemantic ? semanticBySpace?.get(spaceId) ?? meanSem : 0
     const kwSpace = spaceKeywordCoverage(lower, nlpResult, members)
-    const spaceScore = useSemantic ? SEMANTIC_WEIGHT * semSpace + (1 - SEMANTIC_WEIGHT) * kwSpace : kwSpace
+    const spaceScore = useSemantic ? SPACE_SEMANTIC_WEIGHT * semSpace + (1 - SPACE_SEMANTIC_WEIGHT) * kwSpace : kwSpace
 
     if (debug) {
       const semStr = useSemantic ? `sem ${(semSpace * 100).toFixed(0)}%, ` : ''
@@ -174,7 +184,7 @@ function rankSubspaces(
   for (const subspace of subspaces) {
     const kw = scoreSubspace(text, nlpResult, subspace, distinctiveness)
     const sem = semanticById?.get(subspace.id) ?? 0
-    const score = useSemantic ? SEMANTIC_WEIGHT * sem + (1 - SEMANTIC_WEIGHT) * kw : kw
+    const score = useSemantic ? SUBSPACE_SEMANTIC_WEIGHT * sem + (1 - SUBSPACE_SEMANTIC_WEIGHT) * kw : kw
     const ns = nameScore(subspace)
 
     if (debug) {

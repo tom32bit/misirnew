@@ -606,6 +606,12 @@ interface SemanticScores {
   bySpace: Map<number, number>
 }
 
+// The live preview fires on every DOM mutation / focus change, often for text
+// that hasn't changed. Memoize the last query embedding so those repeats reuse
+// it (subspace/space vectors are already cached) — a redundant match then costs
+// only cosine math, no WASM inference.
+let lastQuery: { hash: string; vec: number[] } | null = null
+
 // Cosine similarity of the page against every subspace AND every space, or null
 // when semantic matching isn't available (model off, or embeds couldn't be
 // produced) — callers then fall back to keyword-only matching.
@@ -614,7 +620,15 @@ async function semanticScores(
   spaces: Space[],
   subspaces: SubspaceWithMarkers[],
 ): Promise<SemanticScores | null> {
-  const qVec = await semanticEmbed(text.slice(0, MAX_EMBED_CHARS), 'query')
+  const query = text.slice(0, MAX_EMBED_CHARS)
+  const qHash = textHash(query)
+  let qVec: number[] | null
+  if (lastQuery && lastQuery.hash === qHash) {
+    qVec = lastQuery.vec
+  } else {
+    qVec = await semanticEmbed(query, 'query')
+    if (qVec) lastQuery = { hash: qHash, vec: qVec }
+  }
   if (!qVec) return null
 
   const cache = await loadEmbedCache()
