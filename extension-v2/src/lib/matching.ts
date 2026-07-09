@@ -15,8 +15,16 @@ export interface MatchResult {
 // Scores within this margin are treated as ties, broken by subspace-name match.
 const TIEBREAK_EPSILON = 0.01
 
+// Minimum confidence to count as a match. Real matches score high (60–98%);
+// noise from a single weak marker hit sits ~15–35%, so the floor sits above it.
+const MATCH_THRESHOLD = 0.35
+
 function nameTokens(name: string): string[] {
   return name.toLowerCase().split(/[\s\-_,./()+]+/).filter((t) => t.length >= 3)
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -106,7 +114,7 @@ export function findBestMatch(
   }
 
   // Minimum threshold for a match
-  if (best && best.confidence >= 0.15) {
+  if (best && best.confidence >= MATCH_THRESHOLD) {
     return { subspace: best.subspace, matchedMarkerIds: best.matchedMarkerIds, confidence: best.confidence }
   }
 
@@ -142,41 +150,27 @@ function scoreSubspace(
 }
 
 function scoreMarker(lowerText: string, nlpResult: NLPResult, marker: { label: string; weight: number }): number {
-  const markerLower = marker.label.toLowerCase()
+  const markerLower = marker.label.toLowerCase().trim()
+  if (!markerLower) return 0
 
-  // Exact phrase match in text (highest confidence)
-  if (lowerText.includes(markerLower)) {
-    return 1.0
-  }
+  // Whole-word / whole-phrase match — word boundaries so a short marker can't
+  // match inside an unrelated word (e.g. "roi" inside "steroid").
+  const boundary = new RegExp(`(^|[^a-z0-9])${escapeRegExp(markerLower)}([^a-z0-9]|$)`)
+  if (boundary.test(lowerText)) return 1.0
 
-  // Check tokens
-  for (const token of nlpResult.tokens) {
-    if (token === markerLower || token.includes(markerLower) || markerLower.includes(token)) {
-      return 0.8
-    }
-  }
+  // Exact token / keyword / entity match (lemmatised words) — no partial overlap.
+  if (nlpResult.tokens.includes(markerLower)) return 0.8
+  if (nlpResult.keywords.includes(markerLower)) return 0.7
+  if (nlpResult.entities.some((e) => e.toLowerCase() === markerLower)) return 0.9
 
-  // Check keywords
-  for (const keyword of nlpResult.keywords) {
-    if (keyword === markerLower || keyword.includes(markerLower) || markerLower.includes(keyword)) {
-      return 0.7
-    }
-  }
-
-  // Check entities
-  for (const entity of nlpResult.entities) {
-    if (entity.toLowerCase() === markerLower || entity.toLowerCase().includes(markerLower)) {
-      return 0.9
-    }
-  }
-
-  // Fuzzy match: marker words appear in text
-  const markerWords = markerLower.split(/\s+/).filter(w => w.length > 2)
-  const textWords = new Set(lowerText.split(/\s+/))
-  const wordMatches = markerWords.filter(w => textWords.has(w)).length
-
-  if (markerWords.length > 0 && wordMatches / markerWords.length >= 0.5) {
-    return 0.5 * (wordMatches / markerWords.length)
+  // Multi-word marker: require most of its significant words to appear as whole
+  // words in the text. Single-word markers get no partial credit (avoids noise).
+  const markerWords = markerLower.split(/\s+/).filter((w) => w.length > 2)
+  if (markerWords.length > 1) {
+    const textWords = new Set(lowerText.split(/[^a-z0-9]+/))
+    const hits = markerWords.filter((w) => textWords.has(w)).length
+    const frac = hits / markerWords.length
+    if (frac >= 0.6) return 0.5 * frac
   }
 
   return 0

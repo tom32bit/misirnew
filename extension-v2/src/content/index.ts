@@ -135,6 +135,11 @@ function conversationText(): string | null {
   return messages.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')
 }
 
+// A web page needs at least this much readable text before we try to match it.
+// Canvas apps (Excalidraw, Figma), app shells, and blank pages expose only UI
+// chrome to Readability — matching that produces meaningless results.
+const MIN_WEB_WORDS = 60
+
 // Text used to compute the live match preview — the conversation on AI chats,
 // the Readability article on web pages.
 async function previewText(): Promise<string | null> {
@@ -142,7 +147,8 @@ async function previewText(): Promise<string | null> {
   if (currentMode === 'web') {
     try {
       const content = await extractPageContent(document, window.location.href)
-      return content?.textContent ?? null
+      if (!content || content.wordCount < MIN_WEB_WORDS) return null
+      return content.textContent
     } catch {
       return null
     }
@@ -274,8 +280,9 @@ async function saveWebPage(): Promise<void> {
   setToolbarSaving(true)
   try {
     const pageContent = await extractPageContent(document, window.location.href)
-    if (!pageContent) {
-      log.debug('No extractable content found')
+    if (!pageContent || pageContent.wordCount < MIN_WEB_WORDS) {
+      log.debug('Not enough readable content to capture')
+      setToolbarOutcome({ status: 'nomatch' })
       return
     }
 
