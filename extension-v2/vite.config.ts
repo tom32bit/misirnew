@@ -17,6 +17,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      // Offscreen doc isn't referenced in the manifest (created at runtime),
+      // so declare it explicitly for the build.
+      input: {
+        offscreen: 'src/offscreen/index.html',
+      },
+    },
   },
   server: {
     port: 5173,

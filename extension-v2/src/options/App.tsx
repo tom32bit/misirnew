@@ -54,11 +54,41 @@ export function OptionsApp() {
   const [busy, setBusy] = React.useState(false)
   const [status, setStatus] = React.useState<string | null>(null)
 
+  const [semanticReady, setSemanticReady] = React.useState(false)
+  const [enabling, setEnabling] = React.useState(false)
+  const [progress, setProgress] = React.useState(0)
+  const [semanticNote, setSemanticNote] = React.useState<string | null>(null)
+
   const gpcActive = gpcOptOut()
 
   React.useEffect(() => {
     load()
+    chrome.runtime.sendMessage({ type: 'SEMANTIC_STATUS' }).then((r: any) => setSemanticReady(!!r?.ready)).catch(() => {})
+    // Model download/init progress is broadcast from the offscreen document.
+    const onMsg = (m: any) => {
+      if (m?.type === 'SEMANTIC_PROGRESS' && typeof m.progress?.progress === 'number') {
+        setProgress(Math.round(m.progress.progress))
+      }
+    }
+    chrome.runtime.onMessage.addListener(onMsg)
+    return () => chrome.runtime.onMessage.removeListener(onMsg)
   }, [])
+
+  async function enableSemantic() {
+    setEnabling(true)
+    setProgress(0)
+    setSemanticNote(null)
+    const res: any = await chrome.runtime.sendMessage({ type: 'SEMANTIC_ENABLE' })
+    setEnabling(false)
+    if (res?.ok) setSemanticReady(true)
+    else setSemanticNote(`Couldn’t enable: ${res?.error || 'unknown error'}`)
+  }
+
+  async function testSemantic() {
+    setSemanticNote('Embedding…')
+    const res: any = await chrome.runtime.sendMessage({ type: 'SEMANTIC_TEST', text: 'guava juice recipe' })
+    setSemanticNote(res?.ok ? `Working — produced a ${res.dim}-dimension vector.` : `Failed: ${res?.error || 'unknown'}`)
+  }
 
   async function load() {
     const [consent, masters, list] = await Promise.all([
@@ -411,6 +441,33 @@ export function OptionsApp() {
             <Stat label="Subspaces" value={counts.subspaces} />
             <Stat label="Markers" value={counts.markers} />
           </div>
+        </Section>
+
+        {/* Smart matching (on-device model) */}
+        <Section
+          icon={<Sparkles className="w-4 h-4" />}
+          title="Smart matching (on-device)"
+          note="Optional. Runs the Nomic model in your browser for meaning-based matching, so pages match by topic rather than keywords. Downloads ~140 MB once; nothing leaves your device."
+        >
+          {semanticReady ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--m-text-2)' }}>Enabled — model is on-device.</p>
+              <Button variant="outline" onClick={testSemantic}>Test embedding</Button>
+              {semanticNote && <p style={{ margin: 0, fontSize: 12, color: 'var(--m-text-3)' }}>{semanticNote}</p>}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {enabling && (
+                <div style={{ height: 6, borderRadius: 9999, background: 'var(--m-hover)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progress}%`, background: 'var(--m-accent)', transition: 'width .2s' }} />
+                </div>
+              )}
+              <Button onClick={enableSemantic} disabled={enabling}>
+                {enabling ? `Downloading… ${progress}%` : 'Enable semantic matching (~140 MB)'}
+              </Button>
+              {semanticNote && <p style={{ margin: 0, fontSize: 12, color: 'var(--m-danger)' }}>{semanticNote}</p>}
+            </div>
+          )}
         </Section>
 
         {/* Your data */}

@@ -459,6 +459,58 @@ async function retryPending(): Promise<void> {
   await writeSyncStatus()
 }
 
+// ── Semantic model (offscreen document) ──────────────────────────────────────
+
+const OFFSCREEN_URL = 'src/offscreen/index.html'
+let creatingOffscreen: Promise<void> | null = null
+
+async function ensureOffscreen(): Promise<void> {
+  // hasDocument is available in newer Chrome; guard for older builds.
+  const has = await (chrome.offscreen as any).hasDocument?.()
+  if (has) return
+  if (!creatingOffscreen) {
+    creatingOffscreen = chrome.offscreen
+      .createDocument({
+        url: OFFSCREEN_URL,
+        reasons: ['WORKERS' as chrome.offscreen.Reason],
+        justification: 'Run the on-device embedding model for semantic matching.',
+      })
+      .finally(() => {
+        creatingOffscreen = null
+      })
+  }
+  await creatingOffscreen
+}
+
+// Ask the offscreen document to load the model (downloads on first run).
+async function enableSemantic(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await ensureOffscreen()
+    const res: any = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'SEMANTIC_LOAD' })
+    if (res?.ok) {
+      await chrome.storage.local.set({ misirModelReady: true })
+      return { ok: true }
+    }
+    return { ok: false, error: res?.error || 'load failed' }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) }
+  }
+}
+
+// Embed text through the offscreen model (used by matching once ready).
+async function semanticEmbed(text: string, kind: 'query' | 'document'): Promise<number[] | null> {
+  try {
+    const { misirModelReady } = await chrome.storage.local.get('misirModelReady')
+    if (!misirModelReady) return null
+    await ensureOffscreen()
+    const res: any = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'SEMANTIC_EMBED', text, kind })
+    return res?.ok ? (res.vector as number[]) : null
+  } catch (err: any) {
+    log.error('Semantic embed failed:', errText(err))
+    return null
+  }
+}
+
 // ── Consent sync ─────────────────────────────────────────────────────────────
 
 async function syncConsentToBackend(): Promise<void> {
@@ -599,6 +651,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     syncConsentToBackend()
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }))
+    return true
+  }
+
+  // ── Semantic model ──
+  if (message.type === 'SEMANTIC_STATUS') {
+    chrome.storage.local
+      .get('misirModelReady')
+      .then((r) => sendResponse({ ready: !!r.misirModelReady }))
+      .catch(() => sendResponse({ ready: false }))
+    return true
+  }
+
+  if (message.type === 'SEMANTIC_ENABLE') {
+    enableSemantic().then(sendResponse)
+    return true
+  }
+
+  if (message.type === 'SEMANTIC_TEST') {
+    semanticEmbed(String(message.text || 'guava juice recipe'), 'query')
+      .then((vec) => sendResponse({ ok: !!vec, dim: vec?.length ?? 0, sample: vec?.slice(0, 4) ?? [] }))
+      .catch((err) => sendResponse({ ok: false, error: errText(err) }))
     return true
   }
 

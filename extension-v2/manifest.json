@@ -39,13 +39,19 @@
     "storage",
     "alarms",
     "cookies",
-    "sidePanel"
+    "sidePanel",
+    "offscreen"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "host_permissions": [
     "http://localhost:3000/*",
     "http://localhost:8000/*",
     "https://misir.app/*",
     "https://api.misir.app/*",
+    "https://*.huggingface.co/*",
+    "https://cdn.jsdelivr.net/*",
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
