@@ -8,6 +8,8 @@ import { db, getSubspacesWithMarkers, getPendingCount, clearLocalData } from '@/
 import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent } from '@/lib/api'
 import { processText } from '@/lib/nlp'
 import { findBestMatch } from '@/lib/matching'
+import type { MatchResult } from '@/lib/matching'
+import type { Space, SubspaceWithMarkers } from '@/lib/types'
 import { redactPII } from '@/lib/redact'
 import { chatCaptureToText } from '@/lib/types/chat'
 import type {
@@ -18,6 +20,9 @@ import type {
 } from '@/lib/types'
 
 const log = createConsola({ level: 4 }).withTag('background')
+// Dedicated logger for the matching pipeline so its output is easy to spot and
+// filter in the service-worker console.
+const matchLog = createConsola({ level: 4 }).withTag('match')
 
 // consola renders bare objects as "[object Object]"; pull out something useful.
 function errText(err: unknown): string {
@@ -176,8 +181,7 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     return { matched: false }
   }
 
-  const nlpResult = processText(msg.textContent)
-  const match = findBestMatch(msg.textContent, nlpResult, subspacesWithMarkers)
+  const match = await computeMatch(msg.textContent, subspacesWithMarkers)
   if (!match) {
     log.debug('No match:', msg.url)
     return { matched: false }
@@ -283,8 +287,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
   }
 
   const text = chatCaptureToText(capture)
-  const nlpResult = processText(text)
-  const match = findBestMatch(text, nlpResult, subspacesWithMarkers)
+  const match = await computeMatch(text, subspacesWithMarkers)
   if (!match) {
     log.debug(`No match for ${capture.platform} chat "${capture.title}"`)
     return { matched: false }
@@ -378,8 +381,7 @@ async function handlePreviewMatch(text: string): Promise<CaptureResultMessage> {
   const subspacesWithMarkers = await getSubspacesWithMarkers()
   if (subspacesWithMarkers.length === 0) return { matched: false }
 
-  const nlpResult = processText(text)
-  const match = findBestMatch(text, nlpResult, subspacesWithMarkers)
+  const match = await computeMatch(text, subspacesWithMarkers)
   if (!match) return { matched: false }
 
   return {
@@ -509,6 +511,181 @@ async function semanticEmbed(text: string, kind: 'query' | 'document'): Promise<
     log.error('Semantic embed failed:', errText(err))
     return null
   }
+}
+
+// ── Semantic scoring (topic similarity per subspace) ─────────────────────────
+// Embed the page/chat once (query) and each subspace's topical fingerprint
+// (document), then cosine. Subspace vectors are cached — keyed by a hash of
+// their text — so only the query is embedded on a warm cache.
+
+// Nomic vectors are L2-normalized, so cosine == dot product.
+function cosineSim(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0
+  let dot = 0
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i]
+  return dot
+}
+
+// A subspace's topical fingerprint: its name, description, and marker labels.
+function subspaceDocText(s: SubspaceWithMarkers): string {
+  const markers = s.markers.map((m) => m.label).join(', ')
+  return [s.name, s.description ?? '', markers].filter(Boolean).join('. ')
+}
+
+// A space's topical fingerprint: its name, goal, description, and the union of
+// all its subspaces' marker labels. One clean vector per space beats averaging
+// the subspace vectors — it separates spaces more sharply when Nomic compresses
+// scores (see the two-stage space decision in matching.ts).
+function spaceDocText(space: Space, members: SubspaceWithMarkers[]): string {
+  const labels = new Set<string>()
+  for (const s of members) for (const m of s.markers) labels.add(m.label)
+  return [space.name, space.goal ?? '', space.description ?? '', Array.from(labels).join(', ')]
+    .filter(Boolean)
+    .join('. ')
+}
+
+function textHash(s: string): string {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
+  return `${s.length}:${h}`
+}
+
+// Nomic's context is generous, but longer text just slows WASM inference for no
+// gain in topic signal — cap it.
+const MAX_EMBED_CHARS = 2000
+
+// Cached document vectors, keyed by `sub:<id>` / `space:<id>`. Persisted so a
+// warm cache only ever embeds the query at match time.
+type Embed = { hash: string; vec: number[] }
+let embedCache: Map<string, Embed> | null = null
+
+async function loadEmbedCache(): Promise<Map<string, Embed>> {
+  if (embedCache) return embedCache
+  try {
+    const { misirEmbeds } = await chrome.storage.local.get('misirEmbeds')
+    embedCache = new Map(Object.entries((misirEmbeds ?? {}) as Record<string, Embed>))
+  } catch {
+    embedCache = new Map()
+  }
+  return embedCache
+}
+
+async function persistEmbedCache(): Promise<void> {
+  if (!embedCache) return
+  const obj: Record<string, Embed> = {}
+  for (const [k, v] of embedCache) obj[k] = v
+  try {
+    await chrome.storage.local.set({ misirEmbeds: obj })
+  } catch {
+    /* best-effort cache */
+  }
+}
+
+// Get-or-embed a document vector by cache key; returns null on a model hiccup.
+// Sets `dirty.changed` when it actually embedded (so the caller persists once).
+async function docVector(
+  cache: Map<string, Embed>,
+  key: string,
+  docText: string,
+  dirty: { changed: boolean },
+): Promise<number[] | null> {
+  const hash = textHash(docText)
+  let entry = cache.get(key)
+  if (!entry || entry.hash !== hash) {
+    const vec = await semanticEmbed(docText.slice(0, MAX_EMBED_CHARS), 'document')
+    if (!vec) return null
+    entry = { hash, vec }
+    cache.set(key, entry)
+    dirty.changed = true
+  }
+  return entry.vec
+}
+
+interface SemanticScores {
+  bySubspace: Map<number, number>
+  bySpace: Map<number, number>
+}
+
+// Cosine similarity of the page against every subspace AND every space, or null
+// when semantic matching isn't available (model off, or embeds couldn't be
+// produced) — callers then fall back to keyword-only matching.
+async function semanticScores(
+  text: string,
+  spaces: Space[],
+  subspaces: SubspaceWithMarkers[],
+): Promise<SemanticScores | null> {
+  const qVec = await semanticEmbed(text.slice(0, MAX_EMBED_CHARS), 'query')
+  if (!qVec) return null
+
+  const cache = await loadEmbedCache()
+  const dirty = { changed: false }
+  const bySubspace = new Map<number, number>()
+  const bySpace = new Map<number, number>()
+
+  const membersBySpace = new Map<number, SubspaceWithMarkers[]>()
+  for (const s of subspaces) {
+    const arr = membersBySpace.get(s.spaceId) ?? []
+    arr.push(s)
+    membersBySpace.set(s.spaceId, arr)
+  }
+
+  for (const s of subspaces) {
+    const vec = await docVector(cache, `sub:${s.id}`, subspaceDocText(s), dirty)
+    if (vec) bySubspace.set(s.id, cosineSim(qVec, vec))
+  }
+
+  for (const space of spaces) {
+    const docText = spaceDocText(space, membersBySpace.get(space.id) ?? [])
+    const vec = await docVector(cache, `space:${space.id}`, docText, dirty)
+    if (vec) bySpace.set(space.id, cosineSim(qVec, vec))
+  }
+
+  if (dirty.changed) await persistEmbedCache()
+  return bySubspace.size || bySpace.size ? { bySubspace, bySpace } : null
+}
+
+// Single entry point for matching: keyword + (when enabled) semantic topic
+// similarity. Falls back to keyword-only if the model isn't ready.
+async function computeMatch(
+  text: string,
+  subspaces: SubspaceWithMarkers[],
+): Promise<MatchResult | null> {
+  const nlpResult = processText(text)
+  const spaces = await db.spaces.toArray()
+  const semantic = await semanticScores(text, spaces, subspaces)
+  const mode = semantic ? 'semantic + keyword' : 'keyword-only'
+
+  const preview = text.slice(0, 80).replace(/\s+/g, ' ').trim()
+  matchLog.info(
+    `Matching (${mode}) across ${subspaces.length} subspace(s) — "${preview}…"`,
+  )
+
+  const lines: string[] = []
+  const match = findBestMatch(text, nlpResult, subspaces, {
+    semanticById: semantic?.bySubspace,
+    semanticBySpace: semantic?.bySpace,
+    // Each candidate's score breakdown → console (consola) + the options debug log.
+    debug: (m) => {
+      lines.push(m)
+      dbg(m)
+    },
+  })
+
+  for (const l of lines) matchLog.log(l)
+
+  if (match) {
+    matchLog.success(
+      `→ ${match.subspace.name} @ ${(match.confidence * 100).toFixed(1)}% (space ${match.subspace.spaceId}, markers ${match.matchedMarkerIds.length})`,
+    )
+  } else {
+    matchLog.warn(
+      semantic
+        ? '→ no match (every subspace below the semantic floor / threshold)'
+        : '→ no match (every subspace below the keyword threshold)',
+    )
+  }
+
+  return match
 }
 
 // ── Consent sync ─────────────────────────────────────────────────────────────
@@ -641,7 +818,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'SIGN_OUT') {
-    clearLocalData()
+    embedCache = null
+    Promise.all([clearLocalData(), chrome.storage.local.remove('misirEmbeds')])
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }))
     return true
