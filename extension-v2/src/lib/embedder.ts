@@ -19,9 +19,15 @@ export const EMBED_DIM = 768
 // Fetch weights from the HF hub (not bundled); cache in the browser.
 env.allowLocalModels = false
 env.useBrowserCache = true
-// Load the onnxruntime-web WASM from a CDN so we don't have to bundle/serve it.
+// The onnxruntime glue is loaded via dynamic import(), which MV3's CSP only
+// permits from 'self' — so the ORT .mjs/.wasm must be served from the extension
+// itself (bundled in public/ort/), not a CDN. Single-threaded avoids the
+// SharedArrayBuffer / cross-origin-isolation requirement of the pthreads build.
 const onnxWasm = env.backends?.onnx?.wasm
-if (onnxWasm) onnxWasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/'
+if (onnxWasm) {
+  onnxWasm.wasmPaths = chrome.runtime.getURL('ort/')
+  onnxWasm.numThreads = 1
+}
 
 export type ProgressFn = (p: { status: string; progress?: number; file?: string }) => void
 
