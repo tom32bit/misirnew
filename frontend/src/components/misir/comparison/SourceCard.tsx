@@ -22,7 +22,7 @@ export function SourceCard({
           <span className="font-serif text-[14px] font-semibold text-fg">
             {source.label}
           </span>
-          <span className="rounded-full border border-border bg-bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-fg">
+          <span className="rounded-full border border-border bg-bg-muted px-2 py-0.5 font-sans text-[10px] font-semibold text-fg">
             {source.count} artifact{source.count === 1 ? "" : "s"}
           </span>
         </div>
@@ -38,7 +38,7 @@ export function SourceCard({
           <div className="text-[12px] text-fg-subtle">No findings yet.</div>
         ) : (
           <>
-            <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+            <div className="mb-1.5 font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
               Key findings
             </div>
             {source.findings.slice(0, 5).map((f, i) => (
@@ -48,7 +48,7 @@ export function SourceCard({
                 style={{ gridTemplateColumns: "44px 1fr" }}
               >
                 <div>
-                  <div className="font-mono text-[11px] font-semibold text-fg">
+                  <div className="font-sans text-[11px] font-semibold text-fg">
                     {f.conf}%
                   </div>
                   <div className="mt-0.5 h-[3px] overflow-hidden rounded-sm bg-border-strong">
@@ -72,7 +72,7 @@ export function SourceCard({
           className="mx-4 mb-4 rounded-r-md bg-bg-subtle px-3.5 py-3 dark:bg-bg-inset"
           style={{ borderLeft: `3px solid var(--accent)` }}
         >
-          <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg">
+          <div className="mb-1 font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg">
             Unique signal
           </div>
           <div className="font-serif text-[12px] leading-[1.5] text-fg-muted">

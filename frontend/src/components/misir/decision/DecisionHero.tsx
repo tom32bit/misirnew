@@ -25,8 +25,8 @@ export function DecisionHero({
   deadline: Deadline | null | undefined
 }) {
   return (
-    <div className="rounded-[10px] border border-[rgba(255,108,60,0.2)] bg-[rgba(255,108,60,0.04)] px-[22px] py-5 dark:border-[rgba(255,108,60,0.22)] dark:bg-[rgba(255,108,60,0.07)]">
-      <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-accent">
+    <div className="rounded-[10px] border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.22)] dark:bg-[rgba(217,119,87,0.07)]">
+      <div className="mb-1.5 font-sans text-[10.5px] uppercase tracking-[0.08em] text-accent">
         Active strategic decision
       </div>
       <div className="mb-3.5 font-display text-[22px] font-medium leading-[1.25] tracking-tight text-fg">
@@ -38,7 +38,7 @@ export function DecisionHero({
         style={{ gridTemplateColumns: "1fr auto 1fr" }}
       >
         <Option opt={optionA} primary />
-        <div className="self-center rounded-full border border-border-strong bg-bg px-2.5 py-1 font-mono text-[11px] font-semibold text-fg-muted mobile:hidden">
+        <div className="self-center rounded-full border border-border-strong bg-bg px-2.5 py-1 font-sans text-[11px] font-semibold text-fg-muted mobile:hidden">
           VS
         </div>
         <Option opt={optionB} />
@@ -104,7 +104,7 @@ function Option({
       </div>
       <div
         className={[
-          "inline-flex items-center gap-2 font-mono text-[11px]",
+          "inline-flex items-center gap-2 font-sans text-[11px]",
           primary ? "text-accent" : "text-fg-muted",
         ].join(" ")}
       >

@@ -19,7 +19,7 @@ import { SynthesisGrid } from "./SynthesisGrid"
 type Scope = "all" | number
 
 const SOURCE_COLORS: Record<SourceKey, string> = {
-  claude: "#FF6C3C",
+  claude: "#D97757",
   gemini: "#2A4A7A",
   web: "#2A6A4A",
 }
@@ -118,7 +118,7 @@ export function ComparisonView({ scope }: { scope: Scope }) {
         title="Comparison"
         small="How your sources agree, conflict, and go silent"
         right={
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+          <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
             {totalCaptures} captures · {sources.length} source
             {sources.length === 1 ? "" : "s"}
           </span>

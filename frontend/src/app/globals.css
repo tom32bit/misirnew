@@ -246,6 +246,10 @@
   --border:        rgba(25, 25, 25, 0.10);
   --border-strong: rgba(25, 25, 25, 0.18);
 
+  /* Clay accent — theme-invariant. Alias so inline `var(--accent)` (rings,
+     borders, tints across many components) resolves; was previously undefined. */
+  --accent: #D97757;
+
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;

@@ -96,12 +96,12 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
       {/* Search */}
       <button
         type="button"
-        className="mx-3 mb-2 flex h-[30px] items-center gap-2 rounded-md border border-border-strong bg-bg px-2.5 text-left text-[12.5px] text-fg-muted transition-colors hover:border-fg-faint hover:text-fg"
+        className="mx-3 mb-2 flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-bg px-2.5 text-left text-[12.5px] text-fg-muted transition-colors hover:border-fg-faint hover:text-fg"
         onClick={handleSearch}
       >
         <Icon name="search" size={13} />
         <span>Search what you know…</span>
-        <span className="ml-auto rounded-sm border border-border bg-bg-subtle px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
+        <span className="ml-auto rounded-[5px] border border-border bg-bg-subtle px-1.5 py-0.5 font-sans text-[10px] text-fg-muted">
           ⌘K
         </span>
       </button>
@@ -123,7 +123,7 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
               href={href}
               onClick={closeDrawer}
               className={[
-                "flex h-[30px] items-center gap-2.5 rounded-[5px] px-2.5 text-[13px] transition-colors",
+                "flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
                 active
                   ? "bg-[var(--bg-active)] font-medium text-fg"
                   : "text-fg-muted hover:bg-[var(--bg-hover)] hover:text-fg",
@@ -138,12 +138,7 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
               </span>
               <span className="flex-1">{v.label}</span>
               {count > 0 && (
-                <span
-                  className={[
-                    "font-mono text-[10.5px]",
-                    active ? "text-accent" : "text-accent",
-                  ].join(" ")}
-                >
+                <span className="font-sans text-[10.5px] tabular-nums text-accent">
                   {count}
                 </span>
               )}
@@ -153,7 +148,7 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
       </nav>
 
       {/* Spaces label */}
-      <div className="flex items-center gap-1 px-3.5 pt-3.5 pb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-fg-subtle">
+      <div className="flex items-center gap-1 px-3.5 pt-3.5 pb-1 font-sans text-[10.5px] font-medium uppercase tracking-[0.12em] text-fg-subtle">
         <Icon name="chevron-down" size={11} />
         Spaces
         <button
@@ -177,7 +172,7 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
                 href={`/dashboard/${s.id}/overview`}
                 onClick={closeDrawer}
                 className={[
-                  "flex h-[30px] min-w-0 flex-1 items-center gap-2.5 rounded-[5px] px-2.5 text-[13px] transition-colors",
+                  "flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
                   active
                     ? "bg-[var(--bg-active)] font-medium text-fg"
                     : "text-fg-muted hover:bg-[var(--bg-hover)] hover:text-fg",

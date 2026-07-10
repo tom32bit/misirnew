@@ -24,8 +24,8 @@ export function TensionTable({
   if (rows.length === 0 && !edge) return null
 
   return (
-    <div className="rounded-lg border border-[rgba(255,108,60,0.2)] bg-[rgba(255,108,60,0.04)] px-[22px] py-5 dark:border-[rgba(255,108,60,0.28)] dark:bg-[rgba(255,108,60,0.08)]">
-      <div className="mb-3.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-accent">
+    <div className="rounded-lg border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.28)] dark:bg-[rgba(217,119,87,0.08)]">
+      <div className="mb-3.5 font-sans text-[10.5px] uppercase tracking-[0.08em] text-accent">
         Conflicting take · {title}
       </div>
 
@@ -37,7 +37,7 @@ export function TensionTable({
               className="grid items-center gap-3.5 border-b border-border py-2 last:border-b-0"
               style={{ gridTemplateColumns: "24px 96px 1fr" }}
             >
-              <div className="font-mono text-[10px] text-fg-subtle">
+              <div className="font-sans text-[10px] text-fg-subtle">
                 {String(i + 1).padStart(2, "0")}
               </div>
               <div className="font-serif text-[13px] font-semibold text-fg">{r.from}</div>

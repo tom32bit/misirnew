@@ -28,12 +28,12 @@ export function SynthesisGrid({
   return (
     <Card className="overflow-hidden p-0">
       <CardHeader>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+        <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
           Synthesis — what all sources tell you together
         </span>
         <Spacer />
         {readiness != null && (
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+          <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
             Readiness {readiness}%
           </span>
         )}
@@ -62,7 +62,7 @@ export function SynthesisGrid({
         <SynthesisCol
           icon="eye-off"
           iconColor="var(--accent)"
-          iconBg="rgba(255,108,60,0.1)"
+          iconBg="rgba(217,119,87,0.1)"
           label="What none covered"
           body={blindspot || "—"}
           tinted
@@ -104,7 +104,7 @@ function SynthesisCol({
       className={[
         "px-[22px] py-5",
         divider ? "border-r border-border mobile:border-r-0 mobile:border-b mobile:border-border" : "",
-        tinted ? "bg-[rgba(255,108,60,0.03)] dark:bg-[rgba(255,108,60,0.08)]" : "",
+        tinted ? "bg-[rgba(217,119,87,0.03)] dark:bg-[rgba(217,119,87,0.08)]" : "",
       ].join(" ")}
     >
       <div className="mb-2.5 flex items-center gap-2">
@@ -114,7 +114,7 @@ function SynthesisCol({
         >
           <Icon name={icon} size={13} />
         </div>
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+        <div className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
           {label}
         </div>
       </div>

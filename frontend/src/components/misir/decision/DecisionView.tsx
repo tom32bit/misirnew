@@ -163,7 +163,7 @@ function SpaceDecisionCard({
             showPercent
             fontSize={14}
           />
-          <div className="font-mono text-[10px] tracking-wide text-fg-subtle">
+          <div className="font-sans text-[10px] tracking-wide text-fg-subtle">
             readiness
           </div>
         </div>
@@ -270,7 +270,7 @@ function DecisionEmpty({
 }) {
   return (
     <div className="rounded-[10px] border border-border bg-bg-muted/40 px-[22px] py-9 text-center">
-      <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-subtle">
+      <div className="mb-2 font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-subtle">
         Active strategic decision
       </div>
       <div className="mx-auto max-w-md font-display text-[17px] font-semibold leading-[1.35] tracking-tight text-fg">
@@ -284,7 +284,7 @@ function DecisionEmpty({
           : "Capture a few more sources for this space and Misir will frame the key decision, the options, and the trade-offs — drawn from your own research."}
       </p>
       {!loading && (
-        <div className="mt-3 font-mono text-[11.5px] text-fg-subtle">
+        <div className="mt-3 font-sans text-[11.5px] text-fg-subtle">
           Source coverage {readiness}%
         </div>
       )}

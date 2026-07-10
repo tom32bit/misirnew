@@ -26,11 +26,11 @@ export function KnowledgeGaps({
   return (
     <Card className="p-0 overflow-hidden">
       <CardHeader>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+        <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
           Fill these gaps before deciding
         </span>
         <Spacer />
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+        <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
           {gaps.length} remaining
         </span>
       </CardHeader>
@@ -55,7 +55,7 @@ export function KnowledgeGaps({
           >
             <span
               className={[
-                "inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em]",
+                "inline-flex items-center gap-1.5 font-sans text-[10px] uppercase tracking-[0.08em]",
                 sevTone,
               ].join(" ")}
             >
