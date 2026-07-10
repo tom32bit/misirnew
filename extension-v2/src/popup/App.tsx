@@ -1,28 +1,42 @@
 import React from 'react'
-import { Settings, ExternalLink, Loader2, ShieldAlert, RefreshCw, Globe, Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import {
+  Settings, ExternalLink, Loader2, ShieldAlert, Globe, Sparkles,
+  Bookmark, Check, Plus, ScanLine,
+} from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
+import { db, getPendingCount } from '@/lib/db'
 import { getConsent, setConsent, gpcOptOut } from '@/lib/consent'
 import { apiGetConsent, apiSyncConsent } from '@/lib/api'
-import { getPendingCount } from '@/lib/db'
 import { formatRelativeTime } from '@/lib/utils'
+import type { TabState } from '@/lib/types'
 import logoUrl from '@/assets/misir-logo.png'
 
+// Claude-dark popup palette (mirrors --m-* / the redesign mockup).
+const C = {
+  app: '#262624', raised: '#2E2E2B', text: '#F2F0EA', text2: '#C6C4BC',
+  text3: '#918F87', text4: '#6F6D66', accent: '#D97757', accent2: '#E0906F',
+  accentSoft: 'rgba(217,119,87,0.12)', border: 'rgba(255,255,255,0.075)',
+  border2: 'rgba(255,255,255,0.14)', good: '#83AD84', goodSoft: 'rgba(131,173,132,0.12)',
+  danger: '#C8746A', dangerSoft: 'rgba(200,116,106,0.10)',
+}
+const SERIF = 'var(--font-display)'
+
 const SECTION_LABEL: React.CSSProperties = {
-  margin: '0 0 10px',
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  color: 'var(--m-text-3)',
+  margin: '0 0 12px', fontSize: 10, fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.09em', color: C.text4,
 }
 
 export function PopupApp() {
   const [webConsent, setWebConsent] = React.useState(false)
   const [aiConsent, setAiConsent] = React.useState(false)
   const [pending, setPending] = React.useState(0)
+  const [spaceCount, setSpaceCount] = React.useState(0)
+  const [subspaceCount, setSubspaceCount] = React.useState(0)
   const [lastSyncedMs, setLastSyncedMs] = React.useState<number | null>(null)
+  const [tab, setTab] = React.useState<TabState | null>(null)
+  const [faviconUrl, setFaviconUrl] = React.useState<string | null>(null)
+  const [tabId, setTabId] = React.useState<number | null>(null)
+  const [continuing, setContinuing] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
 
@@ -32,19 +46,73 @@ export function PopupApp() {
 
   async function loadInitialData() {
     try {
-      const [consent, count] = await Promise.all([getConsent(), getPendingCount()])
+      const [consent, pendingCount, spaces, subspaces, sync, tabState] = await Promise.all([
+        getConsent(),
+        getPendingCount(),
+        db.spaces.count(),
+        db.subspaces.count(),
+        chrome.storage.local.get('misirSyncStatus'),
+        loadTabState(),
+      ])
       setWebConsent(consent.webCapture)
       setAiConsent(consent.aiChatCapture)
-      setPending(count)
+      setPending(pendingCount)
+      setSpaceCount(spaces)
+      setSubspaceCount(subspaces)
+      setLastSyncedMs(sync.misirSyncStatus?.lastSyncedMs ?? null)
+      setTab(tabState.state)
+      setFaviconUrl(tabState.favicon)
+      setTabId(tabState.tabId)
       try {
         await apiGetConsent()
       } catch {
-        /* offline or not signed in — local consent still governs the UI */
+        /* offline or signed out — local consent still governs the UI */
       }
     } catch (err) {
-      console.error('Failed to load initial data:', err)
+      console.error('Failed to load popup data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadTabState(): Promise<{ state: TabState | null; favicon: string | null; tabId: number | null }> {
+    try {
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true })
+      const favicon = active?.favIconUrl || null
+      const id = active?.id ?? null
+      if (!active?.id) return { state: null, favicon, tabId: id }
+      try {
+        const state = (await chrome.tabs.sendMessage(active.id, { type: 'GET_TAB_STATE' })) as TabState
+        return { state: state ?? null, favicon, tabId: id }
+      } catch {
+        // No content script on this page (chrome://, store pages, etc.)
+        return {
+          state: {
+            kind: 'inactive', capturable: false, mode: null,
+            title: active.title || active.url || 'This tab',
+            domain: safeHost(active.url), url: active.url || '',
+          },
+          favicon, tabId: id,
+        }
+      }
+    } catch {
+      return { state: null, favicon: null, tabId: null }
+    }
+  }
+
+  // "Save the continuation" — the initial save happens on the page toolbar (with
+  // its consent warning); once saved, the popup can flush the added content.
+  async function handleSaveContinuation() {
+    if (tabId == null || continuing) return
+    setContinuing(true)
+    try {
+      const res = (await chrome.tabs.sendMessage(tabId, { type: 'TRIGGER_SAVE' })) as { ok: boolean; state?: TabState }
+      if (res?.state) setTab(res.state)
+      setPending(await getPendingCount())
+    } catch (err) {
+      console.error('Save continuation failed:', err)
+    } finally {
+      setContinuing(false)
     }
   }
 
@@ -72,17 +140,14 @@ export function PopupApp() {
   const gpcActive = gpcOptOut()
 
   const shell: React.CSSProperties = {
-    width: 360,
-    background: 'var(--m-app)',
-    color: 'var(--m-text)',
-    fontFamily: 'var(--font-sans)',
+    width: 360, background: C.app, color: C.text, fontFamily: 'var(--font-sans)',
   }
 
   if (loading) {
     return (
-      <div style={{ ...shell, padding: 32, textAlign: 'center' }}>
-        <Loader2 className="w-6 h-6 animate-spin" style={{ margin: '0 auto', color: 'var(--m-accent)' }} />
-        <p style={{ marginTop: 12, fontSize: 13, color: 'var(--m-text-2)' }}>Loading…</p>
+      <div style={{ ...shell, padding: 40, textAlign: 'center' }}>
+        <Loader2 className="w-6 h-6 animate-spin" style={{ margin: '0 auto', color: C.accent }} />
+        <p style={{ marginTop: 12, fontSize: 13, color: C.text3 }}>Loading…</p>
       </div>
     )
   }
@@ -90,59 +155,50 @@ export function PopupApp() {
   return (
     <div style={shell}>
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '16px 16px 14px',
-          borderBottom: '1px solid var(--m-border)',
-        }}
-      >
-        <img src={logoUrl} width={24} height={24} alt="Misir" style={{ borderRadius: 6 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>
-            Misir
-          </div>
-        </div>
-        <span style={{ fontSize: 11, color: 'var(--m-text-3)' }}>v2.0</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 17px 15px' }}>
+        <img src={logoUrl} width={26} height={26} alt="Misir" style={{ borderRadius: 7 }} />
+        <span style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 500, letterSpacing: '-0.005em', lineHeight: 1 }}>
+          Misir
+        </span>
+        <SyncPill lastSyncedMs={lastSyncedMs} />
       </div>
+      <Divider />
 
-      {/* Capture consent */}
-      <div style={{ padding: 16 }}>
+      {/* On this tab */}
+      <div style={{ padding: '16px 17px' }}>
+        <h2 style={SECTION_LABEL}>On this tab</h2>
+        <TabCard tab={tab} faviconUrl={faviconUrl} continuing={continuing} onSaveContinuation={handleSaveContinuation} />
+      </div>
+      <Divider />
+
+      {/* Capture */}
+      <div style={{ padding: '16px 17px' }}>
         <h2 style={SECTION_LABEL}>Capture</h2>
-
         {gpcActive && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 12,
-              padding: '9px 11px',
-              borderRadius: 8,
-              background: 'var(--m-danger-soft)',
-              border: '1px solid var(--m-danger)',
-              fontSize: 12,
-              color: 'var(--m-text)',
-            }}
-          >
-            <ShieldAlert className="w-4 h-4" style={{ flex: 'none', color: 'var(--m-danger)' }} />
-            Global Privacy Control is on — capture disabled.
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12, padding: '10px 12px',
+            borderRadius: 10, background: C.dangerSoft, border: `1px solid rgba(200,116,106,0.28)`,
+            fontSize: 11.5, color: C.text2, lineHeight: 1.4,
+          }}>
+            <ShieldAlert style={{ width: 15, height: 15, flex: 'none', color: C.danger }} />
+            Global Privacy Control is on — capture is paused site-wide.
           </div>
         )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{
+          borderRadius: 12, overflow: 'hidden',
+          border: `1px solid ${C.border}`, background: C.raised,
+        }}>
           <ConsentRow
-            icon={<Globe className="w-4 h-4" />}
+            icon={<Globe size={15} />}
             title="Web pages"
             subtitle="Articles, docs & blogs"
             checked={webConsent}
             disabled={gpcActive || saving}
             onChange={(v) => handleConsentChange('web', v)}
           />
+          <div style={{ height: 1, background: C.border }} />
           <ConsentRow
-            icon={<Sparkles className="w-4 h-4" />}
+            icon={<Sparkles size={15} />}
             title="AI conversations"
             subtitle="ChatGPT, Claude, Gemini…"
             checked={aiConsent}
@@ -150,118 +206,297 @@ export function PopupApp() {
             onChange={(v) => handleConsentChange('ai', v)}
           />
         </div>
-
-        <p style={{ margin: '12px 0 0', fontSize: 11, lineHeight: 1.5, color: 'var(--m-text-3)' }}>
-          Off by default. Consent is stored on-device and synced to your account.
+        <p style={{ margin: '13px 3px 0', fontSize: 11, lineHeight: 1.55, color: C.text4 }}>
+          Off by default. Consent stays on your device and syncs to your account.
         </p>
       </div>
+      <Divider />
 
-      <Separator style={{ background: 'var(--m-border)' }} />
-
-      {/* Sync status */}
-      <div style={{ padding: 16 }}>
-        <h2 style={SECTION_LABEL}>Sync</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <StatTile label="Last sync" value={lastSyncedMs ? formatRelativeTime(new Date(lastSyncedMs)) : 'Never'} />
-          <StatTile label="Pending" value={`${pending} item${pending !== 1 ? 's' : ''}`} />
-        </div>
-
-        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => {
-              setLastSyncedMs(Date.now())
-              chrome.runtime.sendMessage({ type: 'FORCE_SYNC_CACHE' })
-            }}
-          >
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-            Sync now
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => chrome.runtime.openOptionsPage()}>
-            <Settings className="w-3.5 h-3.5 mr-1.5" />
-            Settings
-          </Button>
+      {/* Status */}
+      <div style={{ padding: '16px 17px' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Stat value={spaceCount} label="Spaces" accent />
+          <Stat value={subspaceCount} label="Subspaces" />
+          <Stat value={pending} label="Pending" />
         </div>
       </div>
-
-      <Separator style={{ background: 'var(--m-border)' }} />
+      <Divider />
 
       {/* Footer */}
-      <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
-        <Button variant="ghost" size="sm" className="flex-1" onClick={() => chrome.tabs.create({ url: 'https://misir.app/privacy' })}>
-          Privacy
-        </Button>
-        <Button variant="ghost" size="sm" className="flex-1" onClick={() => chrome.tabs.create({ url: 'https://misir.app' })}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '13px 13px 15px' }}>
+        <FootBtn icon={<Settings size={14} />} onClick={() => chrome.runtime.openOptionsPage()}>Settings</FootBtn>
+        <span style={{ flex: 1 }} />
+        <FootBtn icon={<ExternalLink size={14} />} iconRight onClick={() => chrome.tabs.create({ url: 'https://misir.app' })}>
           Open app
-          <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
-        </Button>
+        </FootBtn>
       </div>
     </div>
   )
 }
 
-function ConsentRow({
-  icon,
-  title,
-  subtitle,
-  checked,
-  disabled,
-  onChange,
-}: {
-  icon: React.ReactNode
-  title: string
-  subtitle: string
-  checked: boolean
-  disabled: boolean
-  onChange: (v: boolean) => void
+// ── The live "On this tab" card ──────────────────────────────────────────────
+
+function TabCard({ tab, faviconUrl, continuing, onSaveContinuation }: {
+  tab: TabState | null; faviconUrl: string | null
+  continuing: boolean; onSaveContinuation: () => void
+}) {
+  if (!tab) {
+    return (
+      <div style={cardStyle}>
+        <p style={emptyText}>Couldn’t read this tab.</p>
+      </div>
+    )
+  }
+
+  const inactive = tab.kind === 'inactive'
+  const info = tab.kind === 'match' ? tab.match : undefined
+  const saved = (tab.kind === 'saved' || tab.kind === 'saved-continuation') ? tab.saved : undefined
+  const pct = info?.confidence != null ? Math.round(info.confidence * 100) : null
+
+  // Not a capturable page — a compact icon + message, no title/URL scaffolding.
+  if (inactive) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+          <Favicon url={null} domain={tab.domain} inactive />
+          <p style={{ ...emptyText, marginTop: 4 }}>
+            Misir isn’t active on this page. Open an article or an AI chat to start capturing.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={cardStyle}>
+      {/* Tab identity */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+        <Favicon url={faviconUrl} domain={tab.domain} inactive={inactive} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 13.5, fontWeight: 500, color: C.text, lineHeight: 1.32,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {tab.title}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.text4, marginTop: 3 }}>
+            {tab.domain}{tab.mode === 'aichat' ? ' · conversation' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* State-specific body */}
+      {info && pct != null && (
+        <>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em', color: C.text4 }}>Belongs to</span>
+              <span style={{ fontSize: 11, color: C.text3, fontVariantNumeric: 'tabular-nums' }}>{pct}% confident</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {info.subspaceName ? (
+                <>
+                  <div style={{ fontSize: 12.5, color: C.text3, lineHeight: 1.25 }}>{info.spaceName || 'Your library'}</div>
+                  <div style={{ marginTop: 3, fontFamily: SERIF, fontSize: 17, lineHeight: 1.25, letterSpacing: '-0.01em', color: C.accent2 }}>
+                    {info.subspaceName}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.25, letterSpacing: '-0.01em', color: C.accent2 }}>
+                  {info.spaceName || 'Your library'}
+                </div>
+              )}
+            </div>
+            <div style={{ marginTop: 11, height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 3, background: C.accent, width: `${pct}%` }} />
+            </div>
+          </div>
+          <ToolbarHint icon={<Bookmark size={13} />}>
+            Save it from the <b style={hintB}>Misir</b> button on the page — cleaned and PII-redacted on-device first.
+          </ToolbarHint>
+        </>
+      )}
+
+      {saved && (
+        <>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', background: C.goodSoft, color: C.good, display: 'grid', placeItems: 'center' }}>
+              <Check style={{ width: 13, height: 13 }} />
+            </span>
+            <div>
+              <div style={{ fontFamily: SERIF, fontSize: 15, color: C.text, letterSpacing: '-0.005em' }}>
+                Saved to <span style={{ color: C.accent2 }}>{saved.subspaceName || saved.spaceName || 'your library'}</span>
+              </div>
+              {saved.spaceName && saved.subspaceName && (
+                <div style={{ fontSize: 11.5, color: C.text4, marginTop: 1 }}>{saved.spaceName}</div>
+              )}
+            </div>
+          </div>
+          {tab.kind === 'saved-continuation' && (
+            <>
+              <button onClick={onSaveContinuation} disabled={continuing} style={saveBtnStyle(continuing)}>
+                {continuing
+                  ? <><Loader2 size={15} className="animate-spin" />Saving…</>
+                  : <><Plus size={15} />Save the continuation</>}
+              </button>
+              <p style={{ margin: '9px 3px 0', fontSize: 11, lineHeight: 1.5, color: C.text4 }}>
+                You’ve added more since your last save — cleaned and PII-redacted on-device first.
+              </p>
+            </>
+          )}
+        </>
+      )}
+
+      {tab.kind === 'checking' && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Loader2 className="animate-spin" style={{ width: 14, height: 14, color: C.text3 }} />
+          <span style={emptyText}>Checking this page against your spaces…</span>
+        </div>
+      )}
+
+      {tab.kind === 'nomatch' && (
+        <p style={{ ...emptyText, marginTop: 14 }}>
+          This doesn’t fit any of your spaces, so nothing was captured. Misir only keeps what’s clearly relevant.
+        </p>
+      )}
+
+      {tab.kind === 'gpc' && (
+        <p style={{ ...emptyText, marginTop: 14 }}>
+          Capture is paused here by Global Privacy Control.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ToolbarHint({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div style={{
+      marginTop: 15, display: 'flex', alignItems: 'center', gap: 9,
+      padding: '10px 12px', borderRadius: 10,
+      background: 'rgba(255,255,255,0.028)', border: `1px solid ${C.border}`,
+    }}>
+      <span style={{ width: 24, height: 24, flex: 'none', borderRadius: 6, background: C.accentSoft, color: C.accent2, display: 'grid', placeItems: 'center' }}>
+        {icon}
+      </span>
+      <span style={{ fontSize: 12, lineHeight: 1.45, color: C.text3 }}>{children}</span>
+    </div>
+  )
+}
+
+function Favicon({ url, domain, inactive }: { url: string | null; domain: string; inactive: boolean }) {
+  const [broken, setBroken] = React.useState(false)
+  const box: React.CSSProperties = {
+    width: 32, height: 32, borderRadius: 8, flex: 'none', marginTop: 1,
+    background: inactive ? '#33322F' : '#2A2A27', color: C.text3,
+    display: 'grid', placeItems: 'center', overflow: 'hidden',
+  }
+  if (inactive) {
+    return <span style={box}><ScanLine style={{ width: 15, height: 15 }} /></span>
+  }
+  if (url && !broken) {
+    return (
+      <span style={box}>
+        <img src={url} width={18} height={18} alt="" onError={() => setBroken(true)} style={{ borderRadius: 4 }} />
+      </span>
+    )
+  }
+  return <span style={{ ...box, fontFamily: SERIF, fontSize: 15, fontWeight: 600, color: '#CFE0C4', background: '#35462F' }}>{(domain || '?').charAt(0).toUpperCase()}</span>
+}
+
+// ── Small building blocks ────────────────────────────────────────────────────
+
+const cardStyle: React.CSSProperties = {
+  borderRadius: 13, background: C.raised, border: `1px solid ${C.border}`, padding: '15px 15px 16px',
+}
+const emptyText: React.CSSProperties = { margin: 0, fontSize: 12.5, lineHeight: 1.55, color: C.text3 }
+const hintB: React.CSSProperties = { color: C.text2, fontWeight: 600 }
+
+function saveBtnStyle(busy: boolean): React.CSSProperties {
+  return {
+    marginTop: 14, width: '100%', border: 'none', cursor: busy ? 'default' : 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: 11, borderRadius: 11, background: C.accent, color: '#fff',
+    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, letterSpacing: '0.005em',
+    opacity: busy ? 0.85 : 1,
+  }
+}
+
+function Divider() {
+  return <div style={{ height: 1, background: C.border }} />
+}
+
+function SyncPill({ lastSyncedMs }: { lastSyncedMs: number | null }) {
+  const synced = lastSyncedMs != null
+  return (
+    <span style={{
+      marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+      color: C.text3, fontSize: 11, fontWeight: 500, letterSpacing: '0.01em',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: synced ? C.good : C.text4 }} />
+      {synced ? `Synced · ${formatRelativeTime(new Date(lastSyncedMs!))}` : 'Not synced yet'}
+    </span>
+  )
+}
+
+function ConsentRow({ icon, title, subtitle, checked, disabled, onChange }: {
+  icon: React.ReactNode; title: string; subtitle: string
+  checked: boolean; disabled: boolean; onChange: (v: boolean) => void
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 10,
-        borderRadius: 10,
-        background: 'var(--m-raised)',
-        border: '1px solid var(--m-border)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 30,
-            height: 30,
-            flex: 'none',
-            borderRadius: 8,
-            background: 'var(--m-accent-soft)',
-            color: 'var(--m-accent)',
-          }}
-        >
-          {icon}
-        </span>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>{title}</p>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--m-text-3)' }}>{subtitle}</p>
-        </div>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 13px',
+      background: C.raised, opacity: disabled ? 0.6 : 1,
+    }}>
+      <span style={{
+        width: 28, height: 28, flex: 'none', borderRadius: 8,
+        background: 'rgba(255,255,255,0.05)', color: C.text3, display: 'grid', placeItems: 'center',
+      }}>
+        {icon}
+      </span>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{title}</div>
+        <div style={{ fontSize: 11, color: C.text4, marginTop: 1 }}>{subtitle}</div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} aria-label={`Enable ${title} capture`} />
     </div>
   )
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
-    <div style={{ padding: '12px 12px 13px', borderRadius: 10, background: 'var(--m-raised)', border: '1px solid var(--m-border)' }}>
-      <p style={{ margin: '0 0 5px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--m-text-3)' }}>
-        {label}
-      </p>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{value}</p>
+    <div style={{ flex: 1, textAlign: 'left', borderLeft: label === 'Spaces' ? 'none' : `1px solid ${C.border}`, paddingLeft: label === 'Spaces' ? 0 : 15, paddingRight: 15 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em', color: accent ? C.accent2 : C.text }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.text4, marginTop: 4 }}>{label}</div>
     </div>
   )
+}
+
+function FootBtn({ icon, iconRight, onClick, children }: {
+  icon: React.ReactNode; iconRight?: boolean; onClick: () => void; children: React.ReactNode
+}) {
+  const [hover, setHover] = React.useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 8,
+        fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+        background: 'transparent', border: 'none', color: hover ? C.text : C.text3,
+      }}
+    >
+      {!iconRight && icon}
+      {children}
+      {iconRight && icon}
+    </button>
+  )
+}
+
+function safeHost(url?: string): string {
+  if (!url) return ''
+  try { return new URL(url).hostname } catch { return url }
 }

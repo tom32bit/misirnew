@@ -84,8 +84,17 @@ export interface ChatCapture {
   capturedAt: Date
 }
 
+// Measured attention, sent with a capture (and again on re-capture).
+export interface EngagementSnapshot {
+  dwellTimeMs: number
+  scrollDepth: number
+  readingDepth: number
+  engagementLevel: EngagementLevel
+  baseWeight: number
+}
+
 // Messages between content script and background
-export interface CapturePageMessage {
+export interface CapturePageMessage extends Partial<EngagementSnapshot> {
   type: 'CAPTURE_PAGE'
   url: string
   normalizedUrl: string
@@ -96,7 +105,7 @@ export interface CapturePageMessage {
   wordCount: number
 }
 
-export interface CaptureAIChatMessage {
+export interface CaptureAIChatMessage extends Partial<EngagementSnapshot> {
   type: 'CAPTURE_AI_CHAT'
   capture: ChatCapture
   normalizedUrl: string
@@ -119,6 +128,34 @@ export interface UpdateEngagementMessage {
 export interface PreviewMatchMessage {
   type: 'PREVIEW_MATCH'
   text: string
+}
+
+// A read-only snapshot of what the in-page toolbar is currently showing, so the
+// popup can mirror it without re-running extraction or matching itself.
+export type TabStateKind =
+  | 'inactive'          // not a capturable page (chrome://, the app itself, blocked)
+  | 'gpc'               // capture paused by Global Privacy Control
+  | 'checking'          // extracting / matching in progress
+  | 'match'             // a live match is available (not yet saved)
+  | 'nomatch'           // capturable, but nothing matched
+  | 'saved'             // saved this session
+  | 'saved-continuation' // saved, and the page/chat has since grown
+
+export interface TabMatchInfo {
+  spaceName?: string
+  subspaceName?: string
+  confidence?: number
+}
+
+export interface TabState {
+  kind: TabStateKind
+  capturable: boolean
+  mode: 'aichat' | 'web' | null
+  title: string
+  domain: string
+  url: string
+  match?: TabMatchInfo
+  saved?: TabMatchInfo
 }
 
 export interface CaptureResultMessage {

@@ -198,10 +198,10 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     word_count: msg.wordCount,
     content_source: 'web',
     platform: 'web',
-    engagement_level: 'latent',
-    dwell_time_ms: 0,
-    scroll_depth: 0,
-    reading_depth: 0,
+    engagement_level: msg.engagementLevel ?? 'latent',
+    dwell_time_ms: msg.dwellTimeMs ?? 0,
+    scroll_depth: msg.scrollDepth ?? 0,
+    reading_depth: msg.readingDepth ?? 0,
     space_id: match.subspace.spaceId,
     matched_marker_ids: match.matchedMarkerIds,
     tags: [],
@@ -240,11 +240,11 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
         contentHash: msg.contentHash,
         wordCount: msg.wordCount,
         contentSource: 'web',
-        engagementLevel: 'latent',
-        dwellTimeMs: 0,
-        scrollDepth: 0,
-        readingDepth: 0,
-        baseWeight: 0.2,
+        engagementLevel: msg.engagementLevel ?? 'latent',
+        dwellTimeMs: msg.dwellTimeMs ?? 0,
+        scrollDepth: msg.scrollDepth ?? 0,
+        readingDepth: msg.readingDepth ?? 0,
+        baseWeight: msg.baseWeight ?? 0.2,
         decayRate: 'high',
         relevance: match.confidence,
         matchedMarkerIds: match.matchedMarkerIds,
@@ -304,10 +304,10 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
     word_count: wordCount,
     content_source: 'ai_chat',
     platform: capture.platform,
-    engagement_level: 'active',
-    dwell_time_ms: 0,
-    scroll_depth: 0,
-    reading_depth: 0,
+    engagement_level: msg.engagementLevel ?? 'active',
+    dwell_time_ms: msg.dwellTimeMs ?? 0,
+    scroll_depth: msg.scrollDepth ?? 0,
+    reading_depth: msg.readingDepth ?? 0,
     space_id: match.subspace.spaceId,
     matched_marker_ids: match.matchedMarkerIds,
     tags: [],
@@ -347,11 +347,11 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
         contentHash,
         wordCount,
         contentSource: 'ai_chat',
-        engagementLevel: 'active',
-        dwellTimeMs: 0,
-        scrollDepth: 0,
-        readingDepth: 0,
-        baseWeight: 2.0,
+        engagementLevel: msg.engagementLevel ?? 'active',
+        dwellTimeMs: msg.dwellTimeMs ?? 0,
+        scrollDepth: msg.scrollDepth ?? 0,
+        readingDepth: msg.readingDepth ?? 0,
+        baseWeight: msg.baseWeight ?? 2.0,
         decayRate: 'medium',
         relevance: match.confidence,
         matchedMarkerIds: match.matchedMarkerIds,
@@ -873,6 +873,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     semanticEmbed(String(message.text || 'guava juice recipe'), 'query')
       .then((vec) => sendResponse({ ok: !!vec, dim: vec?.length ?? 0, sample: vec?.slice(0, 4) ?? [] }))
       .catch((err) => sendResponse({ ok: false, error: errText(err) }))
+    return true
+  }
+
+  // Diagnostics: run the wink-nlp pre-gate stage on a sample and report back.
+  if (message.type === 'NLP_TEST') {
+    try {
+      const sample =
+        'The researchers were brewing several batches of Darjeeling tea in London while comparing steeping times.'
+      const r = processText(sample)
+      // wink lemmatizes ("brewing"→"brew") and finds entities; the regex fallback
+      // does neither — so either signal means the real model is active.
+      const winkActive =
+        r.entities.length > 0 ||
+        r.tokens.includes('brew') ||
+        r.tokens.includes('researcher') ||
+        r.tokens.includes('compare')
+      sendResponse({
+        ok: true,
+        engine: winkActive ? 'wink' : 'fallback',
+        tokenCount: r.tokens.length,
+        tokens: r.tokens.slice(0, 10),
+        entities: r.entities.slice(0, 6),
+      })
+    } catch (err) {
+      sendResponse({ ok: false, error: errText(err) })
+    }
     return true
   }
 

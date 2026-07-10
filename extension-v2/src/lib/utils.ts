@@ -27,11 +27,31 @@ export function extractDomain(rawUrl: string): string {
 }
 
 export async function sha256(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text)
-  const buf = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+  // crypto.subtle only exists in a secure context — on http:// pages the content
+  // script's isolated world isn't secure, so it's undefined. This hash is used
+  // only for local dedup (content_hash), never for security, so fall back to a
+  // fast non-cryptographic hash there instead of throwing and killing capture.
+  if (globalThis.crypto?.subtle) {
+    const data = new TextEncoder().encode(text)
+    const buf = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+  }
+  return fnv1a64(text)
+}
+
+// 64-bit FNV-1a (two 32-bit halves via imul) — hex string, dedup-only.
+function fnv1a64(str: string): string {
+  let h1 = 0x811c9dc5
+  let h2 = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ (c & 0xff), 0x01000193)
+    h2 = Math.imul(h2 ^ (c >>> 8), 0x01000193)
+  }
+  const hex = (n: number) => (n >>> 0).toString(16).padStart(8, '0')
+  return 'fnv1a' + hex(h1) + hex(h2)
 }
 
 export function clampString(str: string, maxLen: number): string {

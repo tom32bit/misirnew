@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { AlertTriangle, CheckCircle, X, MessageSquare } from 'lucide-react'
+import { AlertTriangle, CheckCircle } from 'lucide-react'
 import type { PlatformType } from '@/lib/types'
 import { PLATFORM_CONFIG } from './platform-detector'
 
@@ -75,22 +75,23 @@ export function WarningModal({ platform, onProceed, onCancel }: WarningModalProp
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
+          background: 'rgba(10, 9, 8, 0.6)',
           backdropFilter: 'blur(4px)',
         }}
         onClick={onCancel}
       />
 
-      {/* Modal */}
+      {/* Modal — Claude dark, matching the extension's popup/options */}
       <div
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: 480,
+          maxWidth: 440,
           margin: 24,
-          background: 'white',
-          borderRadius: 16,
-          boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+          background: '#262625',
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 18,
+          boxShadow: '0 28px 70px -14px rgba(0,0,0,0.7)',
           overflow: 'hidden',
           animation: 'misirModalIn 0.2s ease-out',
         }}
@@ -98,130 +99,111 @@ export function WarningModal({ platform, onProceed, onCancel }: WarningModalProp
         <style dangerouslySetInnerHTML={{
           __html: `
             @keyframes misirModalIn {
-              from { opacity: 0; transform: scale(0.95) translateY(10px); }
+              from { opacity: 0; transform: scale(0.96) translateY(8px); }
               to { opacity: 1; transform: scale(1) translateY(0); }
             }
           `
         }} />
 
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '20px 24px 16px',
-            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-            borderBottom: '1px solid #fcd34d',
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '24px 24px 0' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 40,
-              height: 40,
-              background: '#f59e0b',
-              borderRadius: 10,
-              color: 'white',
+              width: 38,
+              height: 38,
+              background: 'rgba(217,119,87,0.16)',
+              borderRadius: 11,
+              color: '#E0906F',
+              flexShrink: 0,
             }}
           >
-            <AlertTriangle className="w-6 h-6" />
+            <AlertTriangle style={{ width: 19, height: 19 }} />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1f2937' }}>
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", serif',
+                fontSize: 20,
+                fontWeight: 500,
+                letterSpacing: '-0.01em',
+                color: '#F5F4EF',
+              }}
+            >
               Save entire conversation?
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#92400e' }}>
+            <p style={{ margin: '3px 0 0', fontSize: 13, color: '#91918C' }}>
               {config?.displayName || 'This conversation'}
             </p>
           </div>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '20px 24px' }}>
+        <div style={{ padding: '18px 24px 4px' }}>
           <div
             style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 12,
-              padding: 16,
-              background: '#fefce8',
-              border: '1px solid #fde047',
-              borderRadius: 10,
-              marginBottom: 16,
+              padding: '14px 16px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderLeft: '3px solid #D97757',
+              borderRadius: 12,
             }}
           >
-            <MessageSquare className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div style={{ fontSize: 14, lineHeight: 1.5, color: '#78350f' }}>
-              <p style={{ margin: 0, fontWeight: 500 }}>
-                This will save <strong>ALL messages</strong> in this conversation.
-              </p>
-              <p style={{ margin: '8px 0 0' }}>
-                This includes messages from <strong>other participants</strong>. Only proceed if:
-              </p>
-              <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13 }}>
-                <li>You have their consent, OR</li>
-                <li>This is your personal conversation</li>
-              </ul>
-            </div>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 500, lineHeight: 1.5, color: '#EDEBE6' }}>
+              This saves <strong>every message</strong> in the conversation — including
+              those from <strong>other participants</strong>.
+            </p>
+            <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.55, color: '#AFACA4' }}>
+              Only continue if it&apos;s your own conversation, or you have their consent.
+            </p>
           </div>
 
-          <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
-            <p style={{ margin: '0 0 12px' }}>
-              Your content is processed on-device with PII redaction before upload.
-              Capture is governed by your Misir consent settings.
-            </p>
-            <p style={{ margin: 0, fontSize: 13 }}>
-              <a
-                href="https://misir.app/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: config?.color || '#3b82f6', textDecoration: 'underline' }}
-              >
-                Read our Privacy Policy →
-              </a>
-            </p>
-          </div>
+          <p style={{ margin: '16px 2px 0', fontSize: 13, lineHeight: 1.6, color: '#91918C' }}>
+            Processed on-device with PII redaction before upload, per your Misir consent
+            settings.{' '}
+            <a
+              href="https://misir.app/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#E0906F',
+                textDecoration: 'none',
+                fontWeight: 500,
+                borderBottom: '1px solid rgba(224,144,111,0.35)',
+              }}
+            >
+              Privacy Policy →
+            </a>
+          </p>
         </div>
 
         {/* Actions */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 12,
-            padding: '16px 24px 20px',
-            borderTop: '1px solid #e5e7eb',
-            justifyContent: 'flex-end',
-          }}
-        >
+        <div style={{ display: 'flex', gap: 10, padding: '18px 24px 22px', justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 20px',
-              background: 'white',
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
+              padding: '10px 18px',
+              background: 'transparent',
+              color: '#C4C3BD',
+              border: '1px solid rgba(255,255,255,0.16)',
+              borderRadius: 10,
               fontSize: 14,
               fontWeight: 500,
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              transition: 'background 0.15s ease, border-color 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9fafb'
-              e.currentTarget.style.borderColor = '#9ca3af'
+              e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'white'
-              e.currentTarget.style.borderColor = '#d1d5db'
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'
             }}
           >
-            <X className="w-4 h-4" />
             Cancel
           </button>
 
@@ -230,29 +212,27 @@ export function WarningModal({ platform, onProceed, onCancel }: WarningModalProp
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
-              padding: '10px 20px',
-              background: config?.color || '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
+              gap: 7,
+              padding: '10px 18px',
+              background: '#D97757',
+              color: '#FFFFFF',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10,
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 500,
               cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18)',
+              transition: 'background 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.filter = 'brightness(0.95)'
-              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.background = '#CB6A4A'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.filter = 'brightness(1)'
-              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.background = '#D97757'
             }}
           >
-            <CheckCircle className="w-4 h-4" />
-            Save Conversation
+            <CheckCircle style={{ width: 15, height: 15 }} />
+            Save conversation
           </button>
         </div>
       </div>

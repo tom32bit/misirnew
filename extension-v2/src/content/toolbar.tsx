@@ -32,6 +32,8 @@ interface ToolbarProps {
   outcome?: SaveOutcome | null
   preview?: MatchPreview | null
   checking?: boolean
+  /** A prior save happened this session — the button offers to capture the continuation. */
+  hasSaved?: boolean
 }
 
 // A shadcn-style card, but implemented as scoped, prefixed CSS injected into the
@@ -97,7 +99,7 @@ const CARD_CSS = `
 }
 `
 
-function ToolbarComponent({ onSaveClick, isVisible, isSaving, outcome, preview, checking }: ToolbarProps) {
+function ToolbarComponent({ onSaveClick, isVisible, isSaving, outcome, preview, checking, hasSaved }: ToolbarProps) {
   const [showWarning, setShowWarning] = React.useState(false)
 
   const platformInfo = detectPlatform(window.location.href)
@@ -198,7 +200,7 @@ function ToolbarComponent({ onSaveClick, isVisible, isSaving, outcome, preview, 
             aria-label="Save this page to Misir"
           >
             {isSaving ? <Loader2 /> : <Save />}
-            {isSaving ? 'Saving…' : 'Save to Misir'}
+            {isSaving ? 'Saving…' : hasSaved ? 'Save the continuation' : 'Save to Misir'}
           </button>
         )}
       </div>
@@ -213,6 +215,7 @@ let isSaving = false
 let outcome: SaveOutcome | null = null
 let preview: MatchPreview | null = null
 let checking = false
+let hasSaved = false
 let outcomeTimer: ReturnType<typeof setTimeout> | null = null
 // Hold the real save handler at module scope so every re-render reuses it.
 // (Previously each state change re-rendered with a no-op, disabling the button.)
@@ -240,6 +243,7 @@ function renderToolbar(): void {
       outcome={outcome}
       preview={preview}
       checking={checking}
+      hasSaved={hasSaved}
     />
   )
 }
@@ -273,19 +277,44 @@ export function setToolbarChecking(next: boolean): void {
   renderToolbar()
 }
 
-// Show the result of a save attempt (match score + space, or a no-match notice),
-// then revert the pill to its idle state after a few seconds.
+// Show the result of a save attempt. A 'saved' result PERSISTS (so the user sees
+// it stayed saved) until the conversation/page continues — at which point the
+// content script clears it so the card can offer to capture the continuation. A
+// 'no match' notice is transient and reverts on its own.
 export function setToolbarOutcome(next: SaveOutcome): void {
   outcome = next
   isSaving = false
-  if (outcomeTimer) clearTimeout(outcomeTimer)
+  if (outcomeTimer) {
+    clearTimeout(outcomeTimer)
+    outcomeTimer = null
+  }
+  if (next.status === 'saved') hasSaved = true
   renderToolbar()
 
-  outcomeTimer = setTimeout(() => {
-    outcome = null
+  if (next.status === 'nomatch') {
+    outcomeTimer = setTimeout(() => {
+      outcome = null
+      outcomeTimer = null
+      renderToolbar()
+    }, 4000)
+  }
+}
+
+// Clear a persistent 'saved' outcome (e.g. the conversation continued) so the
+// card returns to the live preview + save button.
+export function clearToolbarOutcome(): void {
+  if (outcomeTimer) {
+    clearTimeout(outcomeTimer)
     outcomeTimer = null
-    renderToolbar()
-  }, next.status === 'saved' ? 5000 : 4000)
+  }
+  outcome = null
+  renderToolbar()
+}
+
+// Reset the per-page save state (on navigation to a new page/conversation).
+export function resetToolbarSaveState(): void {
+  hasSaved = false
+  clearToolbarOutcome()
 }
 
 export function destroyToolbar(): void {

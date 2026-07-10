@@ -1,54 +1,97 @@
 /**
- * NLP processing for artifact matching
- * Ported from old extension, simplified
+ * NLP for the matching pre-gate — real tokenization, lemmatization, and named
+ * entities via wink-nlp (English "lite web" model). Runs in the background
+ * service worker only (matching.ts takes the result; content scripts never load
+ * this, so the model isn't injected into every page).
+ *
+ * This is the FIRST gate in the pipeline: Readability extracts the page text,
+ * wink lemmatizes it and pulls entities, and the matcher checks whether the page
+ * hits any space's markers — BEFORE the (expensive) semantic embedding stage.
  */
+import winkNLP, { type ItemToken } from 'wink-nlp'
+import model from 'wink-eng-lite-web-model'
 
 export interface NLPResult {
+  /** Distinct content-word lemmas, lowercased (stopwords/punctuation removed). */
   tokens: string[]
+  /** Named entities (value strings). */
   entities: string[]
+  /** Most frequent content lemmas, for coarse keyword signals. */
   keywords: string[]
 }
 
-/**
- * Simple tokenization and keyword extraction
- */
+// Init lazily AND defensively: if winkNLP(model) ever throws (e.g. the model
+// can't initialise in this context), it must NOT take down the whole service
+// worker — matching degrades to the regex fallback instead.
+let _nlp: ReturnType<typeof winkNLP> | null = null
+let _nlpFailed = false
+function getNlp(): ReturnType<typeof winkNLP> | null {
+  if (_nlp || _nlpFailed) return _nlp
+  try {
+    _nlp = winkNLP(model)
+  } catch {
+    _nlpFailed = true
+  }
+  return _nlp
+}
+
+// Cap NLP input so a very long page can't stall the worker. Markers that matter
+// almost always appear early, and whole-word marker matching scans the full text
+// separately (see scoreMarker in matching.ts), so this only bounds the lemma set.
+const MAX_NLP_CHARS = 100_000
+
 export function processText(text: string): NLPResult {
   if (!text) return { tokens: [], entities: [], keywords: [] }
 
-  // Basic tokenization
-  const tokens = text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
-    .filter((t) => t.length > 2 && !STOP_WORDS.has(t))
+  const nlp = getNlp()
+  if (!nlp) return fallbackProcess(text.slice(0, MAX_NLP_CHARS))
 
-  // Extract potential entities (capitalized words)
-  const entityMatches = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []
-  const entities = [...new Set(entityMatches.filter(e => e.length > 2))]
+  try {
+    const its = nlp.its
+    const doc = nlp.readDoc(text.slice(0, MAX_NLP_CHARS))
 
-  // Keywords: frequent non-stop words
-  const freq = new Map<string, number>()
-  for (const token of tokens) {
-    freq.set(token, (freq.get(token) || 0) + 1)
+    // Content lemmas: real words only, no stopwords, lemmatized + lowercased.
+    const lemmas: string[] = []
+    doc.tokens().each((t: ItemToken) => {
+      if (t.out(its.type) !== 'word') return
+      if (t.out(its.stopWordFlag)) return
+      // its.lemma needs model addons; wink's `out` typing doesn't model that, so cast.
+      const lemma = String(t.out(its.lemma as never) || t.out(its.normal) || '').toLowerCase()
+      if (lemma.length > 2) lemmas.push(lemma)
+    })
+
+    const tokens = Array.from(new Set(lemmas))
+    const entities = Array.from(new Set(doc.entities().out(its.value) as string[]))
+
+    const freq = new Map<string, number>()
+    for (const l of lemmas) freq.set(l, (freq.get(l) || 0) + 1)
+    const keywords = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25)
+      .map(([word]) => word)
+
+    return { tokens, entities, keywords }
+  } catch {
+    // Defensive: if the model ever fails to init, degrade to a plain tokenizer
+    // rather than break matching entirely.
+    return fallbackProcess(text.slice(0, MAX_NLP_CHARS))
   }
-  const keywords = [...freq.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([word]) => word)
-
-  return { tokens, entities, keywords }
 }
 
-// Common English stop words
-const STOP_WORDS = new Set([
-  'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
-  'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
-  'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
-  'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what',
-  'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me',
-  'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take',
-  'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other',
-  'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
-  'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way',
-  'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+function fallbackProcess(text: string): NLPResult {
+  const tokens = Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length > 2 && !FALLBACK_STOP.has(t)),
+    ),
+  )
+  return { tokens, entities: [], keywords: tokens.slice(0, 25) }
+}
+
+const FALLBACK_STOP = new Set([
+  'the', 'and', 'for', 'that', 'this', 'with', 'you', 'are', 'was', 'not',
+  'have', 'from', 'they', 'but', 'his', 'her', 'she', 'him', 'our', 'their',
 ])

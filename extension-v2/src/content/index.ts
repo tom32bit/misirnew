@@ -7,14 +7,15 @@
  */
 
 import { createConsola } from 'consola'
-import { initToolbar, showToolbar, hideToolbar, setToolbarSaving, setToolbarOutcome, setToolbarPreview, setToolbarChecking, destroyToolbar } from './toolbar'
+import { initToolbar, showToolbar, hideToolbar, setToolbarSaving, setToolbarOutcome, setToolbarPreview, setToolbarChecking, clearToolbarOutcome, resetToolbarSaveState, destroyToolbar, type SaveOutcome, type MatchPreview } from './toolbar'
 import { extractPageContent } from './web-capture'
 import { extractConversation, getExtractor } from './extractors'
 import { detectPlatform } from './platform-detector'
 import { sha256 } from '@/lib/utils'
 import { getConsent, gpcOptOut } from '@/lib/consent'
 import { getBlocklist, isHostBlocked } from '@/lib/blocklist'
-import type { CapturePageMessage, CaptureAIChatMessage, CaptureResultMessage } from '@/lib/types'
+import { EngagementTracker } from './engagement'
+import type { CapturePageMessage, CaptureAIChatMessage, CaptureResultMessage, TabState } from '@/lib/types'
 
 const log = createConsola({ level: 4 }).withTag('content')
 
@@ -24,6 +25,10 @@ type PageMode = 'aichat' | 'web' | null
 
 let contextDead = false
 let currentMode: PageMode = null
+
+// Measures attention (dwell time, scroll depth, reading depth, engagement stage)
+// from page load, so a skimmed page and a deeply-read one aren't weighted alike.
+const engagement = new EngagementTracker(0)
 
 function pageMode(): PageMode {
   if (detectPlatform(window.location.href)) return 'aichat'
@@ -88,10 +93,25 @@ async function sendMessageWithRetry<T = any>(
 
 // ── Platform detection & toolbar ────────────────────────────────────────────
 
+let lastActiveHref = ''
+
 async function checkPlatform(): Promise<void> {
   const mode = await resolveMode()
   const was = currentMode
   currentMode = mode
+
+  // Genuine navigation (new page or conversation) → forget the previous page's
+  // saved state so the card starts fresh rather than showing "Saved" / offering
+  // to continue a chat that's no longer on screen.
+  if (window.location.href !== lastActiveHref) {
+    lastActiveHref = window.location.href
+    savedTextLength = null
+    lastSavedOutcome = null
+    continuationPending = false
+    lastPreview = null
+    matchComputed = false
+    resetToolbarSaveState()
+  }
 
   if (mode && !was) {
     log.debug(`Misir active (${mode})`)
@@ -125,6 +145,62 @@ let previewTimer: ReturnType<typeof setTimeout> | null = null
 let conversationObserver: MutationObserver | null = null
 let lastPreviewHash: string | null = null
 
+// Mirrored UI state, exposed to the popup via GET_TAB_STATE so it can show a
+// read-only view of exactly what the in-page toolbar is showing right now.
+let lastPreview: MatchPreview | null = null
+let lastSavedOutcome: SaveOutcome | null = null
+let continuationPending = false
+let checkingState = false
+// Whether a match has actually been computed for the current page yet. Lets the
+// popup tell "still working / couldn't read the page" apart from a real "no
+// match" — a null lastPreview alone can't distinguish the two.
+let matchComputed = false
+
+// Track the "checking" flag locally in addition to pushing it to the toolbar, so
+// GET_TAB_STATE can report it.
+function setChecking(next: boolean): void {
+  checkingState = next
+  setToolbarChecking(next)
+}
+
+// Read-only snapshot for the popup. Derives the same state the toolbar renders.
+function getTabState(): TabState {
+  const base = {
+    capturable: currentMode != null,
+    mode: currentMode,
+    title: document.title || location.hostname,
+    domain: location.hostname,
+    url: location.href,
+  }
+  if (currentMode == null) return { ...base, kind: 'inactive' }
+  if (gpcOptOut()) return { ...base, kind: 'gpc' }
+  if (lastSavedOutcome) {
+    return { ...base, kind: continuationPending ? 'saved-continuation' : 'saved', saved: lastSavedOutcome }
+  }
+  if (lastPreview?.confidence != null) return { ...base, kind: 'match', match: lastPreview }
+  // Only call it a real "no match" once a match has actually run; until then the
+  // preview is still being computed (or the page/chat wasn't readable yet).
+  if (checkingState || !matchComputed) return { ...base, kind: 'checking' }
+  return { ...base, kind: 'nomatch' }
+}
+
+// Ensure the popup gets a freshly computed match rather than a stale/premature
+// snapshot: if this is a capturable page that hasn't been matched yet, run the
+// preview now and then report.
+async function ensureFreshTabState(): Promise<TabState> {
+  if (currentMode && !gpcOptOut() && !lastSavedOutcome && !matchComputed) {
+    lastPreviewHash = null
+    await refreshPreview()
+  }
+  return getTabState()
+}
+
+// Length of the text captured by the last successful save on this page. When the
+// visible content grows meaningfully past it, the conversation/page continued —
+// so we drop the "Saved" state and re-offer capture. null = nothing saved yet.
+let savedTextLength: number | null = null
+const CONTINUATION_MIN_CHARS = 80
+
 function conversationText(): string | null {
   const extractor = getExtractor(window.location.href)
   if (!extractor) return null
@@ -157,32 +233,46 @@ async function previewText(): Promise<string | null> {
 }
 
 async function refreshPreview(): Promise<void> {
-  if (contextDead || !currentMode) { setToolbarChecking(false); setToolbarPreview(null); return }
-  if (gpcOptOut()) { setToolbarChecking(false); setToolbarPreview(null); return }
+  if (contextDead || !currentMode) { setChecking(false); lastPreview = null; setToolbarPreview(null); return }
+  if (gpcOptOut()) { setChecking(false); lastPreview = null; setToolbarPreview(null); return }
 
   // On web pages, extracting the article (Readability) takes a beat — show a
   // "Checking…" state up front so the card isn't blank on load.
-  if (currentMode === 'web') setToolbarChecking(true)
+  if (currentMode === 'web') setChecking(true)
 
   const text = await previewText()
-  if (!text) { setToolbarChecking(false); setToolbarPreview(null); return }
+  if (!text) { setChecking(false); lastPreview = null; setToolbarPreview(null); return }
+
+  // "Capture further": if we've already saved this page/chat and the visible
+  // content has since grown, the conversation (or article) continued — clear the
+  // persistent "Saved" state so the card offers to capture the continuation.
+  // If it hasn't grown, keep showing "Saved" and skip the match query entirely.
+  if (savedTextLength != null) {
+    if (text.length > savedTextLength + CONTINUATION_MIN_CHARS) {
+      continuationPending = true
+      clearToolbarOutcome()
+    } else {
+      setChecking(false)
+      return
+    }
+  }
 
   // Skip re-querying if the content hasn't materially changed.
   const hash = `${text.length}:${text.slice(0, 48)}:${text.slice(-48)}`
-  if (hash === lastPreviewHash) { setToolbarChecking(false); return }
+  if (hash === lastPreviewHash) { setChecking(false); return }
   lastPreviewHash = hash
 
   try {
     const result = await sendMessageWithRetry<CaptureResultMessage>({ type: 'PREVIEW_MATCH', text })
-    setToolbarPreview(
-      result?.matched
-        ? { spaceName: result.spaceName, subspaceName: result.subspaceName, confidence: result.confidence }
-        : null,
-    )
+    lastPreview = result?.matched
+      ? { spaceName: result.spaceName, subspaceName: result.subspaceName, confidence: result.confidence }
+      : null
+    setToolbarPreview(lastPreview)
+    matchComputed = true
   } catch (err) {
     log.debug('Preview match failed:', err instanceof Error ? err.message : String(err))
   } finally {
-    setToolbarChecking(false)
+    setChecking(false)
   }
 }
 
@@ -204,12 +294,14 @@ function startConversationObserver(): void {
 // Reflect the backend's result in the card.
 function reportOutcome(result: CaptureResultMessage | undefined, what: string): void {
   if (result?.matched) {
-    setToolbarOutcome({
+    lastSavedOutcome = {
       status: 'saved',
       spaceName: result.spaceName,
       subspaceName: result.subspaceName,
       confidence: result.confidence,
-    })
+    }
+    continuationPending = false
+    setToolbarOutcome(lastSavedOutcome)
     log.info(
       `Saved ${what} → ${result.spaceName ?? '?'} (${Math.round((result.confidence ?? 0) * 100)}% match)`,
     )
@@ -252,16 +344,21 @@ async function saveAIChat(): Promise<void> {
       .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n\n')
 
+    const wordCount = text.split(/\s+/).filter(Boolean).length
+    engagement.setWordCount(wordCount)
     const message: CaptureAIChatMessage = {
       type: 'CAPTURE_AI_CHAT',
       capture: conversation,
       normalizedUrl: conversation.url,
       domain: new URL(conversation.url).hostname,
       contentHash: await sha256(text),
-      wordCount: text.split(/\s+/).filter(Boolean).length,
+      wordCount,
+      ...engagement.snapshot(),
     }
 
-    reportOutcome(await sendMessageWithRetry<CaptureResultMessage>(message), `${conversation.platform} conversation`)
+    const result = await sendMessageWithRetry<CaptureResultMessage>(message)
+    reportOutcome(result, `${conversation.platform} conversation`)
+    if (result?.matched) savedTextLength = text.length
   } catch (err) {
     log.error('Save failed:', err)
   } finally {
@@ -286,6 +383,7 @@ async function saveWebPage(): Promise<void> {
       return
     }
 
+    engagement.setWordCount(pageContent.wordCount)
     const message: CapturePageMessage = {
       type: 'CAPTURE_PAGE',
       url: pageContent.url,
@@ -295,9 +393,12 @@ async function saveWebPage(): Promise<void> {
       textContent: pageContent.textContent,
       contentHash: pageContent.contentHash,
       wordCount: pageContent.wordCount,
+      ...engagement.snapshot(),
     }
 
-    reportOutcome(await sendMessageWithRetry<CaptureResultMessage>(message), 'web page')
+    const result = await sendMessageWithRetry<CaptureResultMessage>(message)
+    reportOutcome(result, 'web page')
+    if (result?.matched) savedTextLength = pageContent.textContent.length
   } catch (err) {
     log.error('Web capture failed:', err)
   } finally {
@@ -324,6 +425,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       url: window.location.href,
       contextDead,
     })
+    return true
+  }
+
+  // Read-only snapshot for the popup — mirrors the in-page toolbar. Forces a
+  // fresh match first so the popup never shows a premature "no match".
+  if (message.type === 'GET_TAB_STATE') {
+    ensureFreshTabState()
+      .then((s) => sendResponse(s))
+      .catch(() => sendResponse(getTabState()))
+    return true
+  }
+
+  // The popup's "Save the continuation" action. Only meaningful once this page/
+  // chat has already been saved this session (savedTextLength set) and has since
+  // grown — the initial save still goes through the in-page toolbar (which shows
+  // the consent warning for chats). Consent was granted on that first save, so
+  // the continuation saves directly. Replies with the fresh tab state.
+  if (message.type === 'TRIGGER_SAVE') {
+    handleSaveClick()
+      .then(() => sendResponse({ ok: true, state: getTabState() }))
+      .catch((err) => { log.error('Popup-triggered save failed:', err); sendResponse({ ok: false, state: getTabState() }) })
     return true
   }
 
@@ -406,5 +528,6 @@ sendMessageWithRetry({ type: 'CONTENT_READY', url: window.location.href }).catch
 window.addEventListener('pagehide', () => {
   conversationObserver?.disconnect()
   conversationObserver = null
+  engagement.destroy()
   destroyToolbar()
 })

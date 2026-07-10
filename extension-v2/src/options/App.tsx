@@ -13,7 +13,9 @@ import {
   Globe,
   Sparkles,
   Database,
+  Activity,
 } from 'lucide-react'
+import { Readability } from '@mozilla/readability'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
@@ -59,6 +61,10 @@ export function OptionsApp() {
   const [progress, setProgress] = React.useState(0)
   const [semanticNote, setSemanticNote] = React.useState<string | null>(null)
 
+  // Diagnostics: pass/fail for each stage of the matching pipeline.
+  const [readabilityNote, setReadabilityNote] = React.useState<{ ok: boolean; text: string } | null>(null)
+  const [nlpNote, setNlpNote] = React.useState<{ ok: boolean; text: string } | null>(null)
+
   const gpcActive = gpcOptOut()
 
   React.useEffect(() => {
@@ -88,6 +94,50 @@ export function OptionsApp() {
     setSemanticNote('Embedding…')
     const res: any = await chrome.runtime.sendMessage({ type: 'SEMANTIC_TEST', text: 'guava juice recipe' })
     setSemanticNote(res?.ok ? `Working — produced a ${res.dim}-dimension vector.` : `Failed: ${res?.error || 'unknown'}`)
+  }
+
+  // Diagnostics — run Readability here (needs a DOM, which the options page has)
+  // and the wink-nlp pre-gate in the background (where it lives).
+  function testReadability() {
+    setReadabilityNote({ ok: true, text: 'Parsing…' })
+    try {
+      const body =
+        '<p>Guava is a tropical fruit that grows well in warm, humid climates and ripens quickly after harvest. </p>'.repeat(
+          10,
+        )
+      const html = `<!doctype html><html><head><title>Growing Guava</title></head><body><article><h1>Growing Guava</h1>${body}</article></body></html>`
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const article = new Readability(doc).parse()
+      const words = article?.textContent?.trim().split(/\s+/).filter(Boolean).length ?? 0
+      if (article && words > 0) {
+        setReadabilityNote({ ok: true, text: `Working — extracted ${words} words from “${article.title}”.` })
+      } else {
+        setReadabilityNote({ ok: false, text: 'Failed — Readability parsed no content.' })
+      }
+    } catch (err) {
+      setReadabilityNote({ ok: false, text: `Failed: ${err instanceof Error ? err.message : String(err)}` })
+    }
+  }
+
+  async function testNlp() {
+    setNlpNote({ ok: true, text: 'Running…' })
+    try {
+      const res: any = await chrome.runtime.sendMessage({ type: 'NLP_TEST' })
+      if (res?.ok) {
+        const ents = res.entities?.length ? ` · entities: ${res.entities.join(', ')}` : ''
+        setNlpNote({
+          ok: res.engine === 'wink',
+          text:
+            res.engine === 'wink'
+              ? `wink-nlp active — ${res.tokenCount} lemmas (e.g. ${res.tokens.join(', ')})${ents}.`
+              : `Fallback tokenizer in use (wink-nlp not active) — ${res.tokenCount} tokens.`,
+        })
+      } else {
+        setNlpNote({ ok: false, text: `Failed: ${res?.error || 'unknown'}` })
+      }
+    } catch (err) {
+      setNlpNote({ ok: false, text: `Failed: ${err instanceof Error ? err.message : String(err)}` })
+    }
   }
 
   async function load() {
@@ -470,6 +520,18 @@ export function OptionsApp() {
           )}
         </Section>
 
+        {/* Diagnostics */}
+        <Section
+          icon={<Activity className="w-4 h-4" />}
+          title="Diagnostics"
+          note="Check each stage of the matching pipeline: page extraction (Readability) and the keyword pre-gate (wink NLP)."
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <DiagRow label="Page extraction · Readability" onTest={testReadability} result={readabilityNote} />
+            <DiagRow label="Keyword pre-gate · wink NLP" onTest={testNlp} result={nlpNote} />
+          </div>
+        </Section>
+
         {/* Your data */}
         <Section icon={<Download className="w-4 h-4" />} title="Your data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -501,6 +563,44 @@ export function OptionsApp() {
 }
 
 // ── Presentational helpers ───────────────────────────────────────────────────
+
+function DiagRow({
+  label,
+  onTest,
+  result,
+}: {
+  label: string
+  onTest: () => void
+  result: { ok: boolean; text: string } | null
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <span style={{ fontSize: 13, color: 'var(--m-text-2)' }}>{label}</span>
+        <Button variant="outline" onClick={onTest}>Test</Button>
+      </div>
+      {result && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 6,
+            fontSize: 12,
+            lineHeight: 1.45,
+            color: result.ok ? 'var(--m-text-3)' : 'var(--m-danger)',
+          }}
+        >
+          {result.ok ? (
+            <CheckCircle className="w-3.5 h-3.5" style={{ flex: 'none', marginTop: 1, color: 'var(--m-accent)' }} />
+          ) : (
+            <AlertCircle className="w-3.5 h-3.5" style={{ flex: 'none', marginTop: 1 }} />
+          )}
+          <span>{result.text}</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function Section({
   icon,
