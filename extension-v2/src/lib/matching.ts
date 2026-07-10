@@ -13,29 +13,36 @@ export interface MatchResult {
 }
 
 // Scores within this margin are treated as ties, broken by subspace-name match.
-const TIEBREAK_EPSILON = 0.01
+// Minimum combined confidence for the winning subspace to count as a match.
+const MATCH_THRESHOLD = 0.45
 
-// Minimum confidence to count as a match. Real matches score high (60–98%);
-// noise from a single weak marker hit sits ~15–35%, so the floor sits above it.
-const MATCH_THRESHOLD = 0.35
-
-// When semantic (on-device embedding) scores are supplied, topic similarity
-// leads and keyword coverage refines it: combined = w·semantic + (1-w)·keyword.
+// Space selection is driven by SEMANTIC similarity, which the logs show is the
+// reliable signal: a real tea page scores Tea 0.72–0.78 at the space level,
+// clearly above the other spaces, while off-topic noise sits ~0.50–0.53 and
+// doesn't separate. Keyword coverage is NOT used to pick the space — generic
+// markers ("storage", "water", "brew") let the wrong space in (a C page hit
+// tea's "storage"; an herbal-tea page hit coffee's brewing markers).
 //
-// Stage 1 (space): keyword coverage of a space's markers is a strong, meaningful
-// space signal, so it gets real weight (0.4).
-//
-// Stage 2 (subspace): the candidates are already all in the right space, so
-// they're all on-topic and their semantic scores sit close together. Here a
-// stray keyword hit (e.g. a caffeine article mentioning "water"/"mg" lighting up
-// the "Water Quality" subspace) is mostly noise, so keyword is demoted to a
-// light tie-breaker and topic similarity dominates.
-const SPACE_SEMANTIC_WEIGHT = 0.6
-const SUBSPACE_SEMANTIC_WEIGHT = 0.8
+// Two gates on the top space, both on its semantic score:
+//   FLOOR  — must be genuinely on-topic (real ≥0.60, noise ≤0.53).
+//   MARGIN — must clearly beat the runner-up space; an ambiguous page that
+//            resembles two spaces equally (small gap) is left unmatched.
+const SEMANTIC_FLOOR = 0.60
+const SPACE_MARGIN = 0.07
 
-// A candidate space must clear this floor — stops a page that resembles no space
-// from being saved anywhere (off-topic keyword collisions, blank pages).
-const SEMANTIC_FLOOR = 0.45
+// Subspace pick: subspaces of one space are all on-topic and their semantic
+// scores sit close, so keyword is a light refiner (0.1) — but topic still leads,
+// so a steeping page that name-drops varieties doesn't land in "Varieties".
+const SUBSPACE_SEMANTIC_WEIGHT = 0.9
+
+// Cheap pre-gate only: skip the (WASM) embedding entirely for a page that hits
+// NONE of any space's markers (truly unrelated, e.g. a participant list). One
+// marker is enough to be worth embedding; semantic then decides for real.
+const PREGATE_MIN_HITS = 1
+
+// A marker counts as "present" only at this strength (whole-word / lemma /
+// entity hit), so partial or fuzzy overlaps don't inflate the count.
+const MARKER_HIT_STRENGTH = 0.5
 
 export interface MatchOptions {
   /** cosine similarity per subspace id; when present, matching goes semantic. */
@@ -95,10 +102,11 @@ export function findBestMatch(
     bySpace.set(s.spaceId, arr)
   }
 
-  // ── Stage 1: choose the space ──────────────────────────────────────────────
-  let winner: SubspaceWithMarkers[] | null = null
-  let winnerSem = 0
-  let winnerScore = -1
+  // ── Stage 1: pick the space by semantic similarity, gated by floor + margin ──
+  // Semantic (not keyword) chooses the space — the logs show it's the reliable
+  // signal, whereas generic markers ("storage", "brew") pull in the wrong space.
+  type SpaceCand = { members: SubspaceWithMarkers[]; semSpace: number; kw: number }
+  const spaces: SpaceCand[] = []
 
   for (const [spaceId, members] of bySpace) {
     // Prefer the dedicated space-level document vector; fall back to the mean of
@@ -107,31 +115,85 @@ export function findBestMatch(
     const meanSem = sems.reduce((a, b) => a + b, 0) / (sems.length || 1)
     const semSpace = useSemantic ? semanticBySpace?.get(spaceId) ?? meanSem : 0
     const kwSpace = spaceKeywordCoverage(lower, nlpResult, members)
-    const spaceScore = useSemantic ? SPACE_SEMANTIC_WEIGHT * semSpace + (1 - SPACE_SEMANTIC_WEIGHT) * kwSpace : kwSpace
 
     if (debug) {
+      const hits = markerHitCount(lower, nlpResult, members)
       const semStr = useSemantic ? `sem ${(semSpace * 100).toFixed(0)}%, ` : ''
-      debug(`Space ${spaceId}: ${(spaceScore * 100).toFixed(1)}% (${semStr}kw ${(kwSpace * 100).toFixed(0)}%, ${members.length} subspaces)`)
+      debug(`Space ${spaceId}: ${semStr}kw ${(kwSpace * 100).toFixed(0)}%, ${hits} marker hit${hits === 1 ? '' : 's'}, ${members.length} subspaces`)
     }
 
-    if (spaceScore > winnerScore) {
-      winnerScore = spaceScore
-      winnerSem = semSpace
-      winner = members
-    }
+    spaces.push({ members, semSpace, kw: kwSpace })
   }
 
-  if (!winner) return null
+  // Rank by the reliable signal: semantic when available, keyword otherwise.
+  const rankKey = (c: SpaceCand) => (useSemantic ? c.semSpace : c.kw)
+  spaces.sort((a, b) => rankKey(b) - rankKey(a))
+  const winner = spaces[0]
+  const runnerUp = spaces[1]
 
-  // Off-topic gate at the SPACE level: if the page doesn't resemble even the
-  // best space, don't match it anywhere (kills keyword-collision false matches).
-  if (useSemantic && winnerSem < SEMANTIC_FLOOR) {
-    if (debug) debug(`  best space below semantic floor (${(SEMANTIC_FLOOR * 100).toFixed(0)}%) → no match`)
-    return null
+  if (useSemantic) {
+    // Floor: the page must be genuinely on-topic for the best space.
+    if (winner.semSpace < SEMANTIC_FLOOR) {
+      if (debug) debug(`  best space ${(winner.semSpace * 100).toFixed(0)}% < floor ${(SEMANTIC_FLOOR * 100).toFixed(0)}% → no match`)
+      return null
+    }
+    // Margin: a genuine match pulls ONE space clearly ahead. An unrelated (or
+    // genuinely ambiguous) page resembles two spaces about equally — small gap,
+    // so leave it unmatched rather than guess.
+    if (runnerUp && winner.semSpace - runnerUp.semSpace < SPACE_MARGIN) {
+      if (debug) debug(`  no clear space — best ${(winner.semSpace * 100).toFixed(0)}% vs runner-up ${(runnerUp.semSpace * 100).toFixed(0)}% (< ${(SPACE_MARGIN * 100).toFixed(0)}pt) → no match`)
+      return null
+    }
+  } else if (winner.kw <= 0) {
+    return null // keyword-only fallback: need some marker evidence
   }
 
   // ── Stage 2: choose the subspace within the winning space ───────────────────
-  return rankSubspaces(text, lower, nlpResult, winner, semanticById, debug)
+  return rankSubspaces(text, lower, nlpResult, winner.members, semanticById, debug)
+}
+
+/**
+ * Cheap lexical pre-gate: does ANY space have keyword evidence on this page?
+ * Uses only Readability text + wink NLP (no embedding), so callers can skip the
+ * expensive on-device embedding entirely for pages that can't match anything.
+ */
+export function hasKeywordEvidence(
+  text: string,
+  nlpResult: NLPResult,
+  subspaces: SubspaceWithMarkers[],
+): boolean {
+  const lower = text.toLowerCase()
+  const bySpace = new Map<number, SubspaceWithMarkers[]>()
+  for (const s of subspaces) {
+    const arr = bySpace.get(s.spaceId) ?? []
+    arr.push(s)
+    bySpace.set(s.spaceId, arr)
+  }
+  for (const members of bySpace.values()) {
+    if (markerHitCount(lower, nlpResult, members) >= PREGATE_MIN_HITS) return true
+  }
+  return false
+}
+
+/** How many DISTINCT markers of a space appear (at hit strength) on the page. */
+function markerHitCount(
+  lower: string,
+  nlpResult: NLPResult,
+  members: SubspaceWithMarkers[],
+): number {
+  const seen = new Set<string>()
+  let hits = 0
+  for (const s of members) {
+    for (const m of s.markers) {
+      const key = m.label.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (scoreMarker(lower, nlpResult, { label: m.label, weight: m.weight || 1 }) >= MARKER_HIT_STRENGTH) {
+        hits++
+      }
+    }
+  }
+  return hits
 }
 
 /**
@@ -201,15 +263,10 @@ function rankSubspaces(
       nameScore: ns,
     }
 
-    if (!best) {
-      best = candidate
-      continue
-    }
-    const diff = candidate.confidence - best.confidence
-    if (diff > TIEBREAK_EPSILON) {
-      best = candidate
-    } else if (Math.abs(diff) <= TIEBREAK_EPSILON && candidate.nameScore > best.nameScore) {
-      // Marker scores tie → prefer the subspace whose distinctive name matches.
+    // Highest combined score wins — no name-based tiebreak. (That tiebreak sent
+    // a steeping page to "Varieties" just because the word "varieties" appeared,
+    // over a higher-scored "Brewing Techniques".)
+    if (!best || candidate.confidence > best.confidence) {
       best = candidate
     }
   }

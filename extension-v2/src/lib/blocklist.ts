@@ -23,6 +23,15 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'facebook.com',
   'instagram.com',
   'linkedin.com',
+  // Video meetings (participant lists / UI, never capturable content)
+  'meet.google.com',
+  'zoom.us',
+  'teams.microsoft.com',
+  'teams.live.com',
+  'convay.com',
+  'webex.com',
+  'whereby.com',
+  'meet.jit.si',
   // Misir app itself
   'localhost',
   'misir.app',

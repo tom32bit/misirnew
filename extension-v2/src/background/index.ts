@@ -7,7 +7,7 @@ import { createConsola } from 'consola'
 import { db, getSubspacesWithMarkers, getPendingCount, clearLocalData } from '@/lib/db'
 import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent } from '@/lib/api'
 import { processText } from '@/lib/nlp'
-import { findBestMatch } from '@/lib/matching'
+import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
 import type { MatchResult } from '@/lib/matching'
 import type { Space, SubspaceWithMarkers } from '@/lib/types'
 import { redactPII } from '@/lib/redact'
@@ -665,11 +665,20 @@ async function computeMatch(
   subspaces: SubspaceWithMarkers[],
 ): Promise<MatchResult | null> {
   const nlpResult = processText(text)
+  const preview = text.slice(0, 80).replace(/\s+/g, ' ').trim()
+
+  // Lexical pre-gate (Readability + wink NLP) runs BEFORE any embedding: if the
+  // page contains none of any space's markers, it can't match — bail without
+  // paying for on-device inference.
+  if (!hasKeywordEvidence(text, nlpResult, subspaces)) {
+    matchLog.info(`No keyword evidence across ${subspaces.length} subspace(s) — skipped "${preview}…"`)
+    return null
+  }
+
   const spaces = await db.spaces.toArray()
   const semantic = await semanticScores(text, spaces, subspaces)
   const mode = semantic ? 'semantic + keyword' : 'keyword-only'
 
-  const preview = text.slice(0, 80).replace(/\s+/g, ' ').trim()
   matchLog.info(
     `Matching (${mode}) across ${subspaces.length} subspace(s) — "${preview}…"`,
   )
