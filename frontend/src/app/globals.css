@@ -256,21 +256,21 @@
 }
 
 [data-theme="dark"] {
-  /* Dark — slate palette */
-  --bg:        #191919;
-  --bg-subtle: #262625;
-  --bg-muted:  #40403E;
-  --bg-inset:  #4A4A48;
-  --bg-hover:  rgba(255, 255, 255, 0.04);
+  /* Dark — warm slate palette (Claude ground: #262625, not cold near-black) */
+  --bg:        #262625;
+  --bg-subtle: #2E2D2B;
+  --bg-muted:  #3A3936;
+  --bg-inset:  #444340;
+  --bg-hover:  rgba(255, 255, 255, 0.045);
   --bg-active: rgba(255, 255, 255, 0.07);
 
-  --fg:        #F0F0EB;
-  --fg-muted:  #BFBFBA;
-  --fg-subtle: #91918D;
-  --fg-faint:  #666663;
+  --fg:        #F5F4EF;
+  --fg-muted:  #C4C3BD;
+  --fg-subtle: #92918C;
+  --fg-faint:  #6E6E69;
 
-  --border:        rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --border:        rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   color-scheme: dark;
 }

@@ -40,7 +40,7 @@ export function MisirAsks({
 
   if (!q || ask.dismissed) return null
 
-  const baseStyle = { ["--ma-color" as string]: color } as React.CSSProperties
+  const baseStyle = { ["--ma-color" as string]: "var(--color-accent)" } as React.CSSProperties
 
   // ── Answering ──────────────────────────────────────────────────────
   if (ask.answering && !ask.response) {
@@ -68,7 +68,7 @@ export function MisirAsks({
         <Header subspaceName={submittedTitle} prefix="Misir" />
         <div className="flex flex-col gap-4 px-[22px] pt-3.5 pb-3.5">
           <div className="flex flex-col gap-1.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
+            <span className="font-sans text-[10.5px] font-medium uppercase tracking-[0.1em] text-fg-subtle">
               You said
             </span>
             <p className="m-0 rounded-md bg-bg-muted px-3.5 py-2.5 font-serif text-[13.5px] italic leading-[1.55] text-fg">
@@ -77,7 +77,7 @@ export function MisirAsks({
           </div>
           <div className="flex flex-col gap-1.5">
             <span
-              className="font-mono text-[10px] uppercase tracking-[0.08em]"
+              className="font-sans text-[10.5px] font-medium uppercase tracking-[0.1em]"
               style={{ color }}
             >
               Misir
@@ -119,40 +119,38 @@ export function MisirAsks({
   if (!ask.expanded) {
     return (
       <Card style={baseStyle}>
-        <div className="flex items-center gap-0 px-[22px] py-[11px] transition-colors hover:bg-[color-mix(in_srgb,var(--ma-color)_5%,var(--bg))]">
+        <div className="flex items-center gap-4 px-5 py-4">
           <button
             type="button"
             onClick={() => toggle(space.id)}
-            className="flex min-w-0 flex-1 items-center gap-0 text-left"
+            className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
           >
-            <span
-              className="flex flex-none items-center gap-1.5 pr-3.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap"
-              style={{ color }}
-            >
-              <Icon name="zap" size={11} />
-              Misir asks · {submittedTitle}
+            <span className="whitespace-nowrap font-sans text-[10.5px] font-medium uppercase tracking-[0.12em]">
+              <span className="text-[var(--color-accent)]">Misir asks</span>
+              <span className="text-fg-subtle"> · {submittedTitle}</span>
             </span>
-            <span className="mr-3.5 h-3.5 w-px flex-none bg-[color-mix(in_srgb,var(--ma-color)_25%,var(--border))]" />
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14.5px] font-medium leading-[1.4] tracking-[-0.012em] text-fg mobile:overflow-visible mobile:whitespace-normal">
+            <span className="min-w-0 max-w-full truncate font-serif text-[16px] leading-[1.35] tracking-[-0.01em] text-fg mobile:whitespace-normal">
               {q.question}
             </span>
           </button>
-          <Button
-            variant="primary"
-            colored
-            onClick={() => toggle(space.id)}
-          >
-            Answer
-            <Icon name="arrow-right" size={12} />
-          </Button>
-          <button
-            type="button"
-            aria-label="Ask later"
-            onClick={() => dismiss(space.id)}
-            className="ml-2 grid h-6 w-6 flex-none place-items-center rounded-sm text-fg-subtle hover:bg-[var(--bg-hover)] hover:text-fg"
-          >
-            <Icon name="x" size={13} />
-          </button>
+          <div className="flex flex-none items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => toggle(space.id)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--color-accent)_45%,transparent)] px-3.5 py-1.5 text-[12.5px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)]"
+            >
+              Answer
+              <Icon name="arrow-right" size={12} />
+            </button>
+            <button
+              type="button"
+              aria-label="Ask later"
+              onClick={() => dismiss(space.id)}
+              className="grid h-7 w-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-[var(--bg-hover)] hover:text-fg"
+            >
+              <Icon name="x" size={14} />
+            </button>
+          </div>
         </div>
       </Card>
     )
@@ -182,7 +180,7 @@ function ExpandedAsk({
   setDraft: (id: number, v: string) => void
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null)
-  const baseStyle = { ["--ma-color" as string]: color } as React.CSSProperties
+  const baseStyle = { ["--ma-color" as string]: "var(--color-accent)" } as React.CSSProperties
 
   useEffect(() => {
     const id = setTimeout(() => taRef.current?.focus(), 60)
@@ -259,8 +257,8 @@ function Card({
     <div
       style={style}
       className={[
-        "relative overflow-hidden rounded-[10px] border bg-[color-mix(in_srgb,var(--ma-color,var(--accent))_4%,var(--bg))]",
-        "border-[color-mix(in_srgb,var(--ma-color,var(--accent))_30%,var(--border))]",
+        "relative overflow-hidden rounded-[14px] border bg-[color-mix(in_srgb,var(--ma-color,var(--accent))_11%,var(--bg))]",
+        "border-[color-mix(in_srgb,var(--ma-color,var(--accent))_35%,var(--border))]",
         "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:bg-[var(--ma-color,var(--accent))]",
       ].join(" ")}
     >
@@ -281,7 +279,7 @@ function Header({
   return (
     <div className="flex items-center justify-between px-[22px] pt-3.5">
       <div
-        className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em]"
+        className="flex items-center gap-1.5 font-sans text-[10.5px] font-medium uppercase tracking-[0.1em]"
         style={{ color: "var(--ma-color, var(--accent))" }}
       >
         <Icon name="zap" size={11} />

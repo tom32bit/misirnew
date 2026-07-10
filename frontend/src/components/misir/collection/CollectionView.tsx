@@ -168,7 +168,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
         title="Collection"
         small="Everything the extension captured"
         right={
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+          <span className="font-sans text-[11px] text-fg-subtle tabular-nums">
             {captures.length} total
           </span>
         }
@@ -185,7 +185,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
                 setSpaceFilter(e.target.value)
                 setSubFilter("all")
               }}
-              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-[#61AAF2]"
+              className="h-8 cursor-pointer rounded-lg border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none transition-colors hover:border-border-strong focus:border-[var(--color-accent)]"
             >
               <option value="all">All spaces</option>
               {spaces.map((s) => (
@@ -207,7 +207,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
                 const qs = sp.toString()
                 router.replace(qs ? `?${qs}` : "?")
               }}
-              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-[#61AAF2]"
+              className="h-8 cursor-pointer rounded-lg border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none transition-colors hover:border-border-strong focus:border-[var(--color-accent)]"
             >
               <option value="all">All subspaces</option>
               {(subspaces.data ?? []).map((s) => (
@@ -223,7 +223,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
             placeholder="Search title, marker, source…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-7 min-w-[200px] rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none placeholder:text-fg-faint focus:outline-2 focus:outline-[#61AAF2] focus:-outline-offset-1"
+            className="h-8 min-w-[200px] rounded-lg border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none transition-colors placeholder:text-fg-faint focus:border-[var(--color-accent)]"
           />
           <FilterCount>
             {filtered.length} of {captures.length}
@@ -305,9 +305,9 @@ function DateGroup({
 }) {
   return (
     <>
-      <div className="flex items-center gap-1.5 border-b border-border bg-bg-subtle px-[18px] py-2.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
+      <div className="flex items-center gap-1.5 border-b border-border bg-bg-subtle px-[18px] py-2.5 font-sans text-[10.5px] font-medium uppercase tracking-[0.1em] text-fg-subtle">
         {date}
-        <span className="text-fg-faint">{items.length}</span>
+        <span className="text-fg-faint tabular-nums">{items.length}</span>
       </div>
       {items.map((c) => (
         <CaptureRow
@@ -350,13 +350,13 @@ function CaptureRow({
 
   return (
     <div
-      className="group grid items-center gap-3.5 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
+      className="group grid items-center gap-3.5 border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
       style={{ gridTemplateColumns: "60px 110px 1fr auto auto" }}
     >
-      <div className="whitespace-nowrap font-mono text-[10.5px] text-fg-subtle">
+      <div className="whitespace-nowrap font-sans text-[11px] tabular-nums text-fg-subtle">
         {capture.time}
       </div>
-      <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-fg-muted mobile:hidden">
+      <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap font-sans text-[11px] text-fg-muted mobile:hidden">
         <Icon name={capture.surfaceIcon} size={12} />
         {capture.surface}
       </div>
@@ -383,7 +383,7 @@ function CaptureRow({
           <>
             <button
               onClick={() => { onDelete(capture.id); setConfirming(false) }}
-              className="rounded px-2 py-0.5 text-[11px] font-medium text-white bg-red-500 hover:bg-red-600"
+              className="rounded px-2 py-0.5 text-[11px] font-medium text-white bg-[var(--color-danger)] hover:opacity-90"
             >
               Delete
             </button>
@@ -397,7 +397,7 @@ function CaptureRow({
         ) : (
           <button
             onClick={() => setConfirming(true)}
-            className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint hover:text-red-500 transition-opacity"
+            className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint transition-opacity hover:text-[var(--color-danger)]"
             aria-label="Delete capture"
           >
             <Icon name="trash-2" size={13} />

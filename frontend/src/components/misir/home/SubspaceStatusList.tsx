@@ -1,10 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Icon } from "@/components/misir/primitives/Icon"
 import { Card, ProgressBar } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
 import type { Subspace } from "@/lib/api/types"
 import type { SubspaceVM } from "@/lib/api/capture-adapters"
@@ -58,75 +55,67 @@ function SubspaceCard({
 }) {
   const router = useRouter()
   const color = getSubspaceColor(subspace)
-  const flag = vm.flag
+  const started = vm.captures > 0
+  const go = () =>
+    router.push(`/dashboard/${spaceId}/collection?sub=${subspace.id}`)
 
   return (
     <Card
       role="button"
       tabIndex={0}
-      onClick={() =>
-        router.push(`/dashboard/${spaceId}/collection?sub=${subspace.id}`)
-      }
+      onClick={go}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          router.push(`/dashboard/${spaceId}/collection?sub=${subspace.id}`)
+          go()
         }
       }}
-      className={cn(
-        "h-[148px] cursor-pointer border-t-[3px] transition-colors hover:bg-bg-muted focus-visible:outline-none",
-        flag === "critical" && "bg-[rgba(255,108,60,0.02)]",
-        flag === "low" && "opacity-75",
-      )}
-      style={{ borderTopColor: color } as React.CSSProperties}
+      className={[
+        "flex h-[150px] cursor-pointer flex-col gap-3 rounded-[14px] p-[18px]",
+        "transition-[transform,border-color,background-color] duration-150",
+        "hover:-translate-y-0.5 hover:border-border-strong hover:bg-bg-muted",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
+      ].join(" ")}
     >
-      <div className="flex h-full flex-col p-4">
-        {/* Name — grows to fill vertical space */}
-        <p className="flex-1 font-serif text-[13.5px] font-semibold leading-snug text-fg">
+      {/* Title with a small identity dot (replaces the loud colored top rail) */}
+      <div className="flex items-center gap-2.5">
+        <span
+          className="h-2 w-2 flex-none rounded-full"
+          style={{ background: color, boxShadow: `0 0 0 3px ${color}22` }}
+        />
+        <span className="font-sans text-[14.5px] font-medium leading-none tracking-[-0.01em] text-fg first-letter:uppercase">
           {subspace.name}
+        </span>
+      </div>
+
+      {subspace.description && (
+        <p className="m-0 line-clamp-2 text-[12.5px] leading-[1.5] text-fg-subtle [text-wrap:pretty]">
+          {subspace.description}
         </p>
+      )}
 
-        {/* Badge (only when flagged) */}
-        {flag === "critical" && (
-          <div className="mb-3">
-            <Badge variant="revisit">
-              <Icon name="alert-circle" size={10} />
-              Critical
-            </Badge>
-          </div>
-        )}
-        {flag === "low" && (
-          <div className="mb-3">
-            <Badge
-              variant="secondary"
-              className="font-semibold uppercase tracking-[0.08em]"
-            >
-              <Icon name="alert-triangle" size={10} />
-              Needs pull
-            </Badge>
-          </div>
-        )}
-
-        {/* Progress + stats pinned to bottom */}
-        <div className="flex flex-col gap-1.5">
-          <ProgressBar value={vm.completeness} color={color} />
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] text-fg-subtle">
-              {vm.captures} capture{vm.captures === 1 ? "" : "s"}
-              {vm.weekDelta > 0 && (
-                <span className="ml-1 font-semibold" style={{ color }}>
-                  +{vm.weekDelta}
-                </span>
-              )}
-            </span>
-            <span
-              className="font-mono text-[11px] font-semibold tracking-wide"
-              style={{ color }}
-            >
-              {vm.completeness}%
-            </span>
-          </div>
+      {/* Calm status — no alarming CRITICAL badge. Empty reads as "just starting". */}
+      <div className="mt-auto flex flex-col gap-2.5">
+        <div className="flex items-center gap-3">
+          <ProgressBar value={vm.completeness} color={color} className="flex-1" />
+          <span className="whitespace-nowrap text-[11px] tabular-nums text-fg-faint">
+            {vm.captures} source{vm.captures === 1 ? "" : "s"}
+          </span>
         </div>
+        {started ? (
+          <span
+            className="inline-flex items-center gap-1.5 text-[11px]"
+            style={{ color }}
+          >
+            <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+            {vm.completeness}% ready
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-fg-subtle">
+            <span className="h-2 w-2 rounded-full border-[1.5px] border-fg-faint" />
+            Not started
+          </span>
+        )}
       </div>
     </Card>
   )

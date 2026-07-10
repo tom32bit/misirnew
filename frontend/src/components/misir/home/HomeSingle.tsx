@@ -38,8 +38,8 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
 
   const space = useSpace(spaceId)
   const subspaces = useSubspaces(spaceId)
-  // "Today" card always shows the active day: custom date when picked, else today.
-  const artifactsToday = useArtifacts({ spaceId, period: "today", date, tzOffset, limit: 50 }, 30_000)
+  // Recent-captures card: latest captures in the current window (no day picker).
+  const artifactsRecent = useArtifacts({ spaceId, period, date, tzOffset, limit: 50 }, 30_000)
   const artifactsAll = useArtifacts({ spaceId, period, date, tzOffset, limit: 200 })
   const dashboard = useDashboard(spaceId, period, tzOffset, date)
   const gaps = useGaps(spaceId)
@@ -75,9 +75,9 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
     ],
   )
 
-  const todayCaptures = useMemo(
-    () => adaptCaptures(artifactsToday.data ?? [], new Date(), subspaces.data ?? []),
-    [artifactsToday.data, subspaces.data],
+  const recentCaptures = useMemo(
+    () => adaptCaptures(artifactsRecent.data ?? [], new Date(), subspaces.data ?? []),
+    [artifactsRecent.data, subspaces.data],
   )
 
   if (space.isLoading && !space.data) {
@@ -103,7 +103,7 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
   const ch = space.data
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-[18px]">
       <MisirBrief
         space={ch}
         deadline={deadline.data ?? null}
@@ -135,20 +135,17 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
       <Card className="p-0">
         <CardHeader>
           <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
-            {date
-              ? new Date(date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })
-              : "Today"}{" "}
-            · {todayCaptures.length} capture
-            {todayCaptures.length === 1 ? "" : "s"}
+            Recent · {recentCaptures.length} capture
+            {recentCaptures.length === 1 ? "" : "s"}
           </span>
         </CardHeader>
         <TodayTimeline
           spaceId={spaceId}
-          captures={todayCaptures}
+          captures={recentCaptures}
           subspaces={subspaces.data ?? []}
         />
       </Card>
-    </>
+    </div>
   )
 }
 

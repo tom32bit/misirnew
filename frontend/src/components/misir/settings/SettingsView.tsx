@@ -7,6 +7,7 @@ import { useClerk } from "@clerk/nextjs"
 import { format, parseISO } from "date-fns"
 import { toast } from "sonner"
 import { CalendarIcon, Trash2, Download } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,12 +26,47 @@ type Scope = "all" | number
 
 export function SettingsView({ scope }: { scope: Scope }) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="max-w-[520px]">
-        <AccountPrivacySection />
-      </div>
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5">
+      <AccountPrivacySection />
       {scope !== "all" && <SpaceSettings spaceId={scope} />}
     </div>
+  )
+}
+
+// Claude-style toggle switch — replaces the raw browser checkbox.
+function Toggle({
+  checked,
+  disabled,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onChange: (v: boolean) => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative h-[22px] w-[38px] shrink-0 cursor-pointer rounded-full transition-colors duration-150",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
+        "disabled:cursor-default disabled:opacity-50",
+        checked ? "bg-[var(--color-accent)]" : "bg-[var(--border-strong)]",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-[3px] h-4 w-4 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] transition-[left] duration-150",
+          checked ? "left-[19px]" : "left-[3px]",
+        )}
+      />
+    </button>
   )
 }
 
@@ -130,12 +166,11 @@ function AccountPrivacySection() {
               <div className="text-[13.5px] font-medium text-fg">{p.label}</div>
               <div className="mt-0.5 text-[12px] leading-[1.5] text-fg-muted">{p.desc}</div>
             </div>
-            <input
-              type="checkbox"
+            <Toggle
+              label={p.label}
               checked={!!granted[p.key]}
               disabled={loading}
-              onChange={(e) => void toggle(p.key, e.target.checked)}
-              className="h-5 w-5 shrink-0 cursor-pointer"
+              onChange={(v) => void toggle(p.key, v)}
             />
           </div>
         ))}
@@ -212,7 +247,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-fg-muted">
+      <span className="font-sans text-[10.5px] font-medium uppercase tracking-[0.1em] text-fg-subtle">
         {label}
       </span>
       {children}
@@ -235,7 +270,7 @@ function Section({
   return (
     <div
       className={[
-        "rounded-xl border bg-bg",
+        "rounded-xl border bg-bg-subtle",
         danger
           ? "border-[color-mix(in_srgb,var(--color-danger)_30%,var(--border))]"
           : "border-border",
@@ -243,7 +278,7 @@ function Section({
     >
       <div
         className={[
-          "px-5 py-3 font-mono text-[10px] uppercase tracking-[0.1em]",
+          "px-5 py-3.5 font-sans text-[10.5px] font-medium uppercase tracking-[0.12em]",
           danger ? "text-[var(--color-danger)]" : "text-fg-subtle",
         ].join(" ")}
       >
@@ -353,7 +388,7 @@ function SpaceSettings({ spaceId }: { spaceId: number }) {
   }
 
   return (
-    <div className="flex max-w-[520px] flex-col gap-4">
+    <div className="flex flex-col gap-5">
 
       {/* General */}
       <Section label="General">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -11,6 +11,8 @@ const TABS = [
   { id: "settings", label: "Settings" },
 ] as const
 
+// Claude-style segmented control: a sunken track with the active tab as a
+// raised, softly-shadowed chip (replaces the underline-tab pattern).
 export function SpaceTabNav() {
   const params = useParams<{ scope?: string; view?: string }>()
   const router = useRouter()
@@ -21,32 +23,28 @@ export function SpaceTabNav() {
   if (scope === "all") return null
 
   return (
-    <div className="border-b border-border px-[18px]">
-      <Tabs
-        value={view}
-        onValueChange={(v) => router.push(`/dashboard/${scope}/${v}`)}
-        activationMode="manual"
-      >
-        <TabsList className="h-10 gap-0 rounded-none bg-transparent p-0">
-          {TABS.map((tab) => (
-            <TabsTrigger
+    <div className="flex flex-none justify-center border-b border-border px-[18px] pb-3.5">
+      <div className="inline-flex gap-[3px] rounded-[12px] border border-border bg-bg-subtle p-[3px]">
+        {TABS.map((tab) => {
+          const active = view === tab.id
+          return (
+            <button
               key={tab.id}
-              value={tab.id}
-              className={[
-                "h-full rounded-none px-3 py-0",
-                "text-[13px] font-medium text-fg-muted",
-                "-mb-px border-b-2 border-transparent",
-                "hover:text-fg transition-colors duration-150",
-                "data-[state=active]:bg-transparent",
-                "data-[state=active]:text-fg",
-                "data-[state=active]:border-fg",
-              ].join(" ")}
+              type="button"
+              onClick={() => router.push(`/dashboard/${scope}/${tab.id}`)}
+              className={cn(
+                "rounded-[9px] px-3.5 py-[7px] text-[13px] font-medium transition-colors duration-150",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
+                active
+                  ? "bg-bg-muted text-fg shadow-[0_1px_2px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.05)]"
+                  : "text-fg-subtle hover:text-fg-muted",
+              )}
             >
               {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

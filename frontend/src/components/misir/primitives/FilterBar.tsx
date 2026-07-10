@@ -70,7 +70,7 @@ export function Segmented<T extends string>({
               "h-[26px] px-2.5 text-[11.5px] transition-colors",
               i > 0 && "border-l border-border",
               active
-                ? "bg-bg-muted font-medium text-[#207FDE]"
+                ? "bg-bg-muted font-medium text-fg"
                 : "text-fg-muted hover:text-fg",
             )}
           >
@@ -78,7 +78,7 @@ export function Segmented<T extends string>({
             {o.count !== undefined && o.count !== "" && (
               <span
                 className={cn(
-                  "ml-1 font-mono text-[10px]",
+                  "ml-1 font-sans text-[10px]",
                   o.highlight ? "text-accent" : "text-fg-subtle",
                 )}
               >
@@ -97,7 +97,7 @@ export function Segmented<T extends string>({
  */
 export function FilterCount({ children }: { children: ReactNode }) {
   return (
-    <span className="ml-auto font-mono text-[11px] text-fg-subtle">
+    <span className="ml-auto font-sans text-[11px] text-fg-subtle">
       {children}
     </span>
   )
