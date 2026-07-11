@@ -46,6 +46,13 @@ export function loadEmbedder(onProgress?: ProgressFn): Promise<FeatureExtraction
   return pipePromise
 }
 
+// Drop the cached pipeline so the next loadEmbedder() rebuilds it from scratch.
+// Used to recover from a wedged model/WASM session (e.g. an embed that started
+// throwing) or to force a fresh download after a corrupt cache.
+export function resetEmbedder(): void {
+  pipePromise = null
+}
+
 async function embed(text: string, kind: 'query' | 'document'): Promise<number[]> {
   const extractor = await loadEmbedder()
   const prefix = kind === 'query' ? 'search_query: ' : 'search_document: '

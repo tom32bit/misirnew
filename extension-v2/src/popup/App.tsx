@@ -2,6 +2,7 @@ import React from 'react'
 import {
   Settings, ExternalLink, Loader2, ShieldAlert, Globe, Sparkles,
   Bookmark, Check, Plus, ScanLine, Terminal, RefreshCw, Copy,
+  AlertTriangle, Trash2, FileWarning,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { db, getPendingCount } from '@/lib/db'
@@ -44,11 +45,16 @@ export function PopupApp() {
   const [copied, setCopied] = React.useState(false)
   // Smart (semantic) matching — first-run activation of the on-device model.
   const [semanticReady, setSemanticReady] = React.useState<boolean | null>(null)
+  const [semanticDegraded, setSemanticDegraded] = React.useState(false)
   const [smartDismissed, setSmartDismissed] = React.useState(false)
   const [enabling, setEnabling] = React.useState(false)
   const [enableProgress, setEnableProgress] = React.useState(0)
   const [enableError, setEnableError] = React.useState<string | null>(null)
   const [justEnabled, setJustEnabled] = React.useState(false)
+  // Saves that exhausted their sync retries — surfaced so they can't be lost silently.
+  const [failedSaves, setFailedSaves] = React.useState<FailedSave[]>([])
+  const [failedBusy, setFailedBusy] = React.useState<null | 'retry' | 'discard'>(null)
+  const [failedNote, setFailedNote] = React.useState<string | null>(null)
 
   // Model download/init progress is broadcast from the offscreen document.
   React.useEffect(() => {
@@ -85,6 +91,80 @@ export function PopupApp() {
   function dismissSmartMatching() {
     setSmartDismissed(true)
     chrome.storage.local.set({ misirSmartMatchDismissed: true }).catch(() => {})
+  }
+
+  // Recover a degraded model: force a clean reload (re-inits, re-downloads if the
+  // browser evicted the cache). Reuses the same progress plumbing as first enable.
+  async function reloadSmartMatching() {
+    if (enabling) return
+    setEnabling(true)
+    setEnableProgress(0)
+    setEnableError(null)
+    try {
+      const res = (await chrome.runtime.sendMessage({ type: 'SEMANTIC_RELOAD' })) as { ok?: boolean; error?: string }
+      if (res?.ok) {
+        setSemanticDegraded(false)
+        setSemanticReady(true)
+        setJustEnabled(true)
+        setTimeout(() => setJustEnabled(false), 3500)
+      } else {
+        setEnableError(res?.error || 'Reload failed. Please try again.')
+      }
+    } catch {
+      setEnableError('Couldn’t reach the model. Please try again.')
+    } finally {
+      setEnabling(false)
+    }
+  }
+
+  async function loadFailedSaves() {
+    try {
+      const res = (await chrome.runtime.sendMessage({ type: 'GET_FAILED_SAVES' })) as { items?: FailedSave[] }
+      setFailedSaves(res?.items ?? [])
+    } catch {
+      setFailedSaves([])
+    }
+  }
+
+  async function retryFailedSaves() {
+    if (failedBusy) return
+    setFailedBusy('retry')
+    setFailedNote(null)
+    try {
+      const res = (await chrome.runtime.sendMessage({ type: 'RETRY_FAILED_SAVES' })) as
+        { ok?: boolean; requeued?: number; remaining?: number }
+      await loadFailedSaves()
+      setPending(await getPendingCount())
+      if (res?.ok) {
+        const synced = (res.requeued ?? 0) - (res.remaining ?? 0)
+        setFailedNote(
+          res.remaining
+            ? `${res.remaining} still couldn’t sync — check your connection and try again.`
+            : synced > 0 ? `Synced ${synced} item${synced === 1 ? '' : 's'}.` : 'Requeued.',
+        )
+      } else {
+        setFailedNote('Couldn’t retry right now. Please try again.')
+      }
+    } catch {
+      setFailedNote('Couldn’t retry right now. Please try again.')
+    } finally {
+      setFailedBusy(null)
+      setTimeout(() => setFailedNote(null), 5000)
+    }
+  }
+
+  async function discardFailedSaves() {
+    if (failedBusy) return
+    setFailedBusy('discard')
+    setFailedNote(null)
+    try {
+      await chrome.runtime.sendMessage({ type: 'DISCARD_FAILED_SAVES' })
+      await loadFailedSaves()
+    } catch {
+      /* leave them listed if discard failed */
+    } finally {
+      setFailedBusy(null)
+    }
   }
 
   async function fetchLogs() {
@@ -135,11 +215,13 @@ export function PopupApp() {
 
       // Smart-matching model status + whether the user dismissed the prompt.
       const [semStatus, dismiss] = await Promise.all([
-        chrome.runtime.sendMessage({ type: 'SEMANTIC_STATUS' }).catch(() => ({ ready: false })),
+        chrome.runtime.sendMessage({ type: 'SEMANTIC_STATUS' }).catch(() => ({ ready: false, degraded: false })),
         chrome.storage.local.get('misirSmartMatchDismissed'),
       ])
       setSemanticReady(!!(semStatus as { ready?: boolean })?.ready)
+      setSemanticDegraded(!!(semStatus as { degraded?: boolean })?.degraded)
       setSmartDismissed(!!dismiss.misirSmartMatchDismissed)
+      await loadFailedSaves()
       try {
         await apiGetConsent()
       } catch {
@@ -243,13 +325,23 @@ export function PopupApp() {
 
       <SmartMatchBanner
         ready={semanticReady}
+        degraded={semanticDegraded}
         dismissed={smartDismissed}
         enabling={enabling}
         progress={enableProgress}
         error={enableError}
         justEnabled={justEnabled}
         onEnable={enableSmartMatching}
+        onReload={reloadSmartMatching}
         onDismiss={dismissSmartMatching}
+      />
+
+      <FailedSavesBanner
+        items={failedSaves}
+        busy={failedBusy}
+        note={failedNote}
+        onRetry={retryFailedSaves}
+        onDiscard={discardFailedSaves}
       />
 
       {/* On this tab */}
@@ -302,6 +394,10 @@ export function PopupApp() {
 
       {/* Status */}
       <div style={{ padding: '16px 17px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+          <h2 style={{ ...SECTION_LABEL, margin: 0 }}>Status</h2>
+          <MatchModeChip ready={semanticReady} degraded={semanticDegraded} />
+        </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Stat value={spaceCount} label="Spaces" accent />
           <Stat value={subspaceCount} label="Subspaces" />
@@ -554,17 +650,31 @@ function Divider() {
 // First-run activation of the on-device semantic model. Prominent until the user
 // enables it (matching's core value) or dismisses it (keyword-only fallback).
 function SmartMatchBanner({
-  ready, dismissed, enabling, progress, error, justEnabled, onEnable, onDismiss,
+  ready, degraded, dismissed, enabling, progress, error, justEnabled, onEnable, onReload, onDismiss,
 }: {
   ready: boolean | null
+  degraded: boolean
   dismissed: boolean
   enabling: boolean
   progress: number
   error: string | null
   justEnabled: boolean
   onEnable: () => void
+  onReload: () => void
   onDismiss: () => void
 }) {
+  const busyBlock = (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ height: 5, borderRadius: 5, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.max(4, progress)}%`, background: C.accent, borderRadius: 5, transition: 'width .25s' }} />
+      </div>
+      <div style={{ marginTop: 7, fontSize: 11.5, color: C.text3, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Loader2 size={12} className="animate-spin" />
+        {progress > 0 ? `Loading… ${progress}%` : 'Starting…'}
+      </div>
+    </div>
+  )
+
   // Brief success confirmation after enabling.
   if (justEnabled) {
     return (
@@ -581,6 +691,42 @@ function SmartMatchBanner({
               <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Smart matching is on</div>
               <div style={{ fontSize: 11.5, color: C.text4 }}>Pages now match by meaning, on-device.</div>
             </div>
+          </div>
+        </div>
+        <Divider />
+      </>
+    )
+  }
+
+  // Enabled but embedding is failing — matching quietly fell back to keywords.
+  // Tell the user plainly and give them a one-tap recovery.
+  if (ready === true && degraded) {
+    return (
+      <>
+        <div style={{ padding: '14px 15px' }}>
+          <div style={{ borderRadius: 13, background: C.dangerSoft, border: '1px solid rgba(200,116,106,0.28)', padding: '14px 14px 15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+              <span style={{ width: 26, height: 26, flex: 'none', borderRadius: 8, background: 'rgba(200,116,106,0.18)', color: C.danger, display: 'grid', placeItems: 'center' }}>
+                <AlertTriangle size={15} />
+              </span>
+              <span style={{ fontFamily: SERIF, fontSize: 15, color: C.text, letterSpacing: '-0.005em' }}>Smart matching hit a snag</span>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: C.text2 }}>
+              The on-device model stopped responding, so matching is running on <b style={{ color: C.text }}>keywords only</b> for now. Reloading usually fixes it.
+            </p>
+            {error && <p style={{ margin: '9px 1px 0', fontSize: 11.5, lineHeight: 1.45, color: C.danger }}>{error}</p>}
+            {enabling ? busyBlock : (
+              <button
+                onClick={onReload}
+                style={{
+                  marginTop: 13, width: '100%', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 10, background: C.accent,
+                  color: '#fff', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                }}
+              >
+                <RefreshCw size={13} />Reload model
+              </button>
+            )}
           </div>
         </div>
         <Divider />
@@ -645,6 +791,91 @@ function SmartMatchBanner({
   )
 }
 
+// A save that exhausted its sync retries and would otherwise be silently lost.
+interface FailedSave {
+  id: number
+  title: string
+  domain: string
+  contentSource: string
+  capturedAt: number
+}
+
+// Surfaces stuck saves so the user can retry (e.g. after being offline) or
+// discard them — never silent data loss. Renders nothing when the queue is clean.
+function FailedSavesBanner({
+  items, busy, note, onRetry, onDiscard,
+}: {
+  items: FailedSave[]
+  busy: null | 'retry' | 'discard'
+  note: string | null
+  onRetry: () => void
+  onDiscard: () => void
+}) {
+  if (items.length === 0) return null
+  const n = items.length
+
+  return (
+    <>
+      <div style={{ padding: '14px 15px' }}>
+        <div style={{ borderRadius: 13, background: C.dangerSoft, border: '1px solid rgba(200,116,106,0.28)', padding: '14px 14px 15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+            <span style={{ width: 26, height: 26, flex: 'none', borderRadius: 8, background: 'rgba(200,116,106,0.18)', color: C.danger, display: 'grid', placeItems: 'center' }}>
+              <AlertTriangle size={15} />
+            </span>
+            <span style={{ fontFamily: SERIF, fontSize: 15, color: C.text, letterSpacing: '-0.005em' }}>
+              {n} save{n === 1 ? '' : 's'} couldn’t sync
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: C.text2 }}>
+            These are stored on your device but haven’t reached your account after several tries — usually a dropped connection. Retry when you’re back online, or discard them.
+          </p>
+
+          <div style={{ marginTop: 11, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {items.slice(0, 4).map((it) => (
+              <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <FileWarning size={13} style={{ flex: 'none', color: C.text4 }} />
+                <span style={{ fontSize: 11.5, color: C.text3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {it.title || it.domain || 'Untitled'}
+                </span>
+              </div>
+            ))}
+            {n > 4 && <span style={{ fontSize: 11, color: C.text4, paddingLeft: 21 }}>and {n - 4} more…</span>}
+          </div>
+
+          {note && <p style={{ margin: '10px 1px 0', fontSize: 11.5, lineHeight: 1.45, color: C.text3 }}>{note}</p>}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 13 }}>
+            <button
+              onClick={onRetry}
+              disabled={busy != null}
+              style={{
+                flex: 1, border: 'none', cursor: busy ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center',
+                justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 10, background: C.accent,
+                color: '#fff', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, opacity: busy ? 0.85 : 1,
+              }}
+            >
+              {busy === 'retry' ? <><Loader2 size={13} className="animate-spin" />Retrying…</> : <><RefreshCw size={13} />Retry all</>}
+            </button>
+            <button
+              onClick={onDiscard}
+              disabled={busy != null}
+              style={{
+                border: `1px solid ${C.border2}`, cursor: busy ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 13px', borderRadius: 10, background: 'transparent', color: C.text2,
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, opacity: busy ? 0.85 : 1,
+              }}
+            >
+              {busy === 'discard' ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Discard
+            </button>
+          </div>
+        </div>
+      </div>
+      <Divider />
+    </>
+  )
+}
+
 function MiniBtn({ icon, onClick, children }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -694,6 +925,33 @@ function ConsentRow({ icon, title, subtitle, checked, disabled, onChange }: {
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} aria-label={`Enable ${title} capture`} />
     </div>
+  )
+}
+
+// Always-visible indicator of HOW matching is running right now, so semantic vs
+// keyword-only is never a silent mystery. Mirrors the model's real state.
+function MatchModeChip({ ready, degraded }: { ready: boolean | null; degraded: boolean }) {
+  if (ready == null) return null // still loading status
+  const semantic = ready && !degraded
+  const dot = degraded ? C.danger : semantic ? C.good : C.text4
+  const label = degraded ? 'Keywords · degraded' : semantic ? 'Semantic matching' : 'Keyword matching'
+  return (
+    <span
+      title={
+        degraded
+          ? 'The on-device model is failing; matching fell back to keywords.'
+          : semantic
+            ? 'Pages match by meaning via the on-device model.'
+            : 'Matching by keywords only. Enable smart matching for meaning-based matches.'
+      }
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 500,
+        letterSpacing: '0.02em', color: degraded ? C.danger : C.text3,
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot }} />
+      {label}
+    </span>
   )
 }
 

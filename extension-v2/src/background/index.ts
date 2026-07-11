@@ -4,7 +4,11 @@
  */
 
 import { createConsola } from 'consola'
-import { db, getSubspacesWithMarkers, getPendingCount, clearLocalData } from '@/lib/db'
+import {
+  db, getSubspacesWithMarkers, getPendingCount, clearLocalData,
+  getFailedArtifacts, getFailedCount, requeueFailedArtifacts, discardFailedArtifacts,
+  MAX_SYNC_ATTEMPTS,
+} from '@/lib/db'
 import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
 import { processText } from '@/lib/nlp'
 import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
@@ -151,9 +155,9 @@ async function pushArtifactToBackend(payload: any): Promise<number | null> {
 
 async function writeSyncStatus(): Promise<void> {
   try {
-    const pendingCount = await getPendingCount()
+    const [pendingCount, failedCount] = await Promise.all([getPendingCount(), getFailedCount()])
     await chrome.storage.local.set({
-      misirSyncStatus: { lastSyncedMs: Date.now(), pendingCount },
+      misirSyncStatus: { lastSyncedMs: Date.now(), pendingCount, failedCount },
     })
   } catch {
     /* best-effort */
@@ -569,7 +573,7 @@ async function handleUpdateEngagement(msg: UpdateEngagementMessage): Promise<voi
 
 async function retryPending(): Promise<void> {
   const pending = await db.pendingArtifacts
-    .filter((a) => !a.syncedAt && (a.syncAttempts ?? 0) < 5)
+    .filter((a) => !a.syncedAt && (a.syncAttempts ?? 0) < MAX_SYNC_ATTEMPTS)
     .toArray()
 
   for (const artifact of pending) {
@@ -655,6 +659,21 @@ async function enableSemantic(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
+// "Degraded" = the model was enabled (misirModelReady) but embedding is failing,
+// so matching has silently fallen back to keyword-only. We persist this so the
+// popup can TELL the user instead of leaving them to wonder why matches got worse.
+async function setModelDegraded(degraded: boolean): Promise<void> {
+  try {
+    const { misirModelDegraded } = await chrome.storage.local.get('misirModelDegraded')
+    const isDegraded = !!misirModelDegraded
+    if (degraded === isDegraded) return // avoid needless writes / storage churn
+    if (degraded) await chrome.storage.local.set({ misirModelDegraded: Date.now() })
+    else await chrome.storage.local.remove('misirModelDegraded')
+  } catch {
+    /* best-effort */
+  }
+}
+
 // Embed text through the offscreen model (used by matching once ready).
 async function semanticEmbed(text: string, kind: 'query' | 'document'): Promise<number[] | null> {
   try {
@@ -662,10 +681,34 @@ async function semanticEmbed(text: string, kind: 'query' | 'document'): Promise<
     if (!misirModelReady) return null
     await ensureOffscreen()
     const res: any = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'SEMANTIC_EMBED', text, kind })
-    return res?.ok ? (res.vector as number[]) : null
+    if (res?.ok) {
+      await setModelDegraded(false) // a good embed clears any prior degraded state
+      return res.vector as number[]
+    }
+    // Enabled but the embed failed — matching just fell back to keyword-only.
+    log.warn('Semantic embed returned no vector — matching degraded to keyword-only')
+    await setModelDegraded(true)
+    return null
   } catch (err: any) {
     log.error('Semantic embed failed:', errText(err))
+    await setModelDegraded(true)
     return null
+  }
+}
+
+// Force a clean reload of the model (recover from a degraded/wedged state).
+async function reloadSemantic(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await ensureOffscreen()
+    const res: any = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'SEMANTIC_LOAD', reload: true })
+    if (res?.ok) {
+      await chrome.storage.local.set({ misirModelReady: true })
+      await setModelDegraded(false)
+      return { ok: true }
+    }
+    return { ok: false, error: res?.error || 'reload failed' }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) }
   }
 }
 
@@ -947,20 +990,59 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'GET_SYNC_STATUS') {
-    getPendingCount().then((pendingCount) => {
+    Promise.all([getPendingCount(), getFailedCount()]).then(([pendingCount, failedCount]) => {
       chrome.storage.local.get('misirSyncStatus', (r) => {
         sendResponse({
           lastSyncedMs: r.misirSyncStatus?.lastSyncedMs ?? null,
           pendingCount,
+          failedCount,
         })
       })
-    }).catch(() => sendResponse({ lastSyncedMs: null, pendingCount: 0 }))
+    }).catch(() => sendResponse({ lastSyncedMs: null, pendingCount: 0, failedCount: 0 }))
     return true
   }
 
   if (message.type === 'FORCE_SYNC_CACHE') {
     syncCache()
       .then(() => sendResponse({ ok: true }))
+      .catch((err: any) => sendResponse({ ok: false, error: err?.message || String(err) }))
+    return true
+  }
+
+  // Stuck saves (exhausted retries) — listed in the popup so nothing is lost silently.
+  if (message.type === 'GET_FAILED_SAVES') {
+    getFailedArtifacts()
+      .then((items) => sendResponse({
+        items: items.map((a) => ({
+          id: a.id,
+          title: a.title,
+          domain: a.domain,
+          contentSource: a.contentSource,
+          capturedAt: a.capturedAt instanceof Date ? a.capturedAt.getTime() : a.capturedAt,
+        })),
+      }))
+      .catch(() => sendResponse({ items: [] }))
+    return true
+  }
+
+  if (message.type === 'RETRY_FAILED_SAVES') {
+    requeueFailedArtifacts()
+      .then(async (requeued) => {
+        await retryPending()
+        await writeSyncStatus()
+        const remaining = await getFailedCount()
+        sendResponse({ ok: true, requeued, remaining })
+      })
+      .catch((err: any) => sendResponse({ ok: false, error: err?.message || String(err) }))
+    return true
+  }
+
+  if (message.type === 'DISCARD_FAILED_SAVES') {
+    discardFailedArtifacts()
+      .then(async (discarded) => {
+        await writeSyncStatus()
+        sendResponse({ ok: true, discarded })
+      })
       .catch((err: any) => sendResponse({ ok: false, error: err?.message || String(err) }))
     return true
   }
@@ -1041,14 +1123,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // ── Semantic model ──
   if (message.type === 'SEMANTIC_STATUS') {
     chrome.storage.local
-      .get('misirModelReady')
-      .then((r) => sendResponse({ ready: !!r.misirModelReady }))
-      .catch(() => sendResponse({ ready: false }))
+      .get(['misirModelReady', 'misirModelDegraded'])
+      .then((r) => sendResponse({ ready: !!r.misirModelReady, degraded: !!r.misirModelDegraded }))
+      .catch(() => sendResponse({ ready: false, degraded: false }))
     return true
   }
 
   if (message.type === 'SEMANTIC_ENABLE') {
     enableSemantic().then(sendResponse)
+    return true
+  }
+
+  if (message.type === 'SEMANTIC_RELOAD') {
+    reloadSemantic().then(sendResponse)
     return true
   }
 
@@ -1106,11 +1193,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 async function updateSmartMatchBadge(): Promise<void> {
   try {
-    const { misirModelReady, misirSmartMatchDismissed } = await chrome.storage.local.get([
-      'misirModelReady',
-      'misirSmartMatchDismissed',
-    ])
-    if (!misirModelReady && !misirSmartMatchDismissed) {
+    const { misirModelReady, misirSmartMatchDismissed, misirModelDegraded } =
+      await chrome.storage.local.get(['misirModelReady', 'misirSmartMatchDismissed', 'misirModelDegraded'])
+    if (misirModelDegraded) {
+      // Enabled but failing — flag it so the user notices matching is degraded.
+      await chrome.action.setBadgeText({ text: '!' })
+      await chrome.action.setBadgeBackgroundColor({ color: '#C8746A' })
+    } else if (!misirModelReady && !misirSmartMatchDismissed) {
       await chrome.action.setBadgeText({ text: '●' })
       await chrome.action.setBadgeBackgroundColor({ color: '#D97757' })
     } else {
@@ -1121,9 +1210,12 @@ async function updateSmartMatchBadge(): Promise<void> {
   }
 }
 
-// Keep the badge in sync when the model is enabled or the prompt is dismissed.
+// Keep the badge in sync when the model is enabled, dismissed, or degrades.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && ('misirModelReady' in changes || 'misirSmartMatchDismissed' in changes)) {
+  if (
+    area === 'local' &&
+    ('misirModelReady' in changes || 'misirSmartMatchDismissed' in changes || 'misirModelDegraded' in changes)
+  ) {
     updateSmartMatchBadge()
   }
 })
