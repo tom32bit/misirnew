@@ -117,6 +117,20 @@ export async function apiDeleteAccount(): Promise<void> {
 }
 
 /**
+ * Feedback loop: teach a subspace the salient terms from a page the user
+ * corrected onto it, as low-weight "learned" markers.
+ */
+export async function apiLearnMarkers(
+  spaceId: number,
+  subspaceId: number,
+  terms: string[],
+): Promise<{ added: Array<{ id: number; label: string }> }> {
+  return api
+    .post(`spaces/${spaceId}/subspaces/${subspaceId}/markers/learn`, { json: { terms } })
+    .json<{ added: Array<{ id: number; label: string }> }>()
+}
+
+/**
  * Sync local consent with backend
  */
 export async function apiSyncConsent(consent: { webCapture: boolean; aiChatCapture: boolean }): Promise<void> {

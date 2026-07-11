@@ -18,6 +18,28 @@ export function SidePanelApp() {
   const [subspaces, setSubspaces] = useState<SubspaceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [savingPage, setSavingPage] = useState(false)
+  const [saveNote, setSaveNote] = useState<string | null>(null)
+
+  // "Save page" must go to the ACTIVE TAB's content script (which has the page
+  // DOM), not the service worker — the SW's CAPTURE_PAGE handler runs on an empty
+  // payload and silently no-ops.
+  async function handleSavePage() {
+    if (savingPage) return
+    setSavingPage(true)
+    setSaveNote(null)
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) throw new Error('no active tab')
+      const res = (await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_PAGE' })) as { ok?: boolean }
+      setSaveNote(res?.ok ? 'Saved this page.' : 'Nothing to save on this page.')
+    } catch {
+      setSaveNote("Can’t save here — open an article, then try again.")
+    } finally {
+      setSavingPage(false)
+      setTimeout(() => setSaveNote(null), 4000)
+    }
+  }
 
   useEffect(() => {
     loadSubspaces()
@@ -171,15 +193,20 @@ export function SidePanelApp() {
         <Separator style={{ margin: '14px 0', background: 'var(--m-border)' }} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Button variant="outline" className="h-auto py-3 flex-col gap-1.5" onClick={() => chrome.runtime.sendMessage({ type: 'CAPTURE_PAGE' })}>
+          <Button variant="outline" className="h-auto py-3 flex-col gap-1.5" disabled={savingPage} onClick={handleSavePage}>
             <Globe className="w-5 h-5" />
-            <span style={{ fontSize: 12 }}>Save page</span>
+            <span style={{ fontSize: 12 }}>{savingPage ? 'Saving…' : 'Save page'}</span>
           </Button>
           <Button variant="outline" className="h-auto py-3 flex-col gap-1.5" onClick={() => chrome.runtime.openOptionsPage()}>
             <FolderOpen className="w-5 h-5" />
             <span style={{ fontSize: 12 }}>Settings</span>
           </Button>
         </div>
+        {saveNote && (
+          <p style={{ margin: '10px 0 0', fontSize: 11.5, textAlign: 'center', color: 'var(--m-text-3)' }}>
+            {saveNote}
+          </p>
+        )}
       </div>
     </div>
   )

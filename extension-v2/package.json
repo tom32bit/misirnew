@@ -9,6 +9,8 @@
     "prebuild": "npm run copy:ort",
     "build": "tsc && vite build && node scripts/trim-ort.mjs",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint . --ext ts,tsx",
     "postinstall": "npm run copy:ort"
   },
@@ -48,6 +50,7 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^2.1.9"
   }
 }

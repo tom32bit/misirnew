@@ -31,13 +31,24 @@ const SEMANTIC_FLOOR = 0.60
 const SPACE_MARGIN = 0.07
 
 // Subspace pick: subspaces of one space are all on-topic and their semantic
-// scores sit close, so keyword is a light refiner (0.1) — but topic still leads,
-// so a steeping page that name-drops varieties doesn't land in "Varieties".
-const SUBSPACE_SEMANTIC_WEIGHT = 0.9
+// scores sit VERY close (real logs show ~6 siblings inside an 8-point band, which
+// Nomic can't separate reliably). So keyword carries real weight here (0.25) —
+// both to discriminate among near-tied siblings, and so the correction feedback
+// loop's learned markers can actually move a bunched ranking. Topic still leads
+// (0.75), and distinctiveness + the single-marker de-rate below keep an incidental
+// or lone marker from hijacking the pick.
+const SUBSPACE_SEMANTIC_WEIGHT = 0.75
 
-// Cheap pre-gate only: skip the (WASM) embedding entirely for a page that hits
-// NONE of any space's markers (truly unrelated, e.g. a participant list). One
-// marker is enough to be worth embedding; semantic then decides for real.
+// A subspace corroborated by only ONE marker is low-confidence (a single
+// distinctive term that happens to appear can inflate its keyword score). Halve
+// its keyword contribution so broad corroboration wins over a lone-marker fluke.
+const SINGLE_MARKER_DERATE = 0.5
+
+// Minimum distinct marker hits for lexical evidence. Used at EVERY stage:
+//   pre-gate — skip the (WASM) embedding for a page that hits NO space's markers;
+//   stage 1  — a space is eligible only if ≥1 of its markers appears;
+//   stage 2  — a subspace must have ≥1 marker hit to win (else it's a fallback).
+// Semantic still ranks within each gated set — keyword only decides eligibility.
 const PREGATE_MIN_HITS = 1
 
 // A marker counts as "present" only at this strength (whole-word / lemma /
@@ -73,13 +84,16 @@ function escapeRegExp(s: string): string {
  * subspaces flat lets an unrelated space's subspaces (Coffee) sit close to the
  * right ones on marginal scores. So we:
  *
- *   1. Pick the SPACE — aggregate each space's signal (mean semantic similarity
- *      + keyword coverage of its markers) and take the strongest. This is a
- *      decisive call: a guava page scores ~63% for Guava vs ~50% for Coffee.
- *   2. Pick the SUBSPACE — rank only the winning space's subspaces, breaking
- *      near-ties on DISTINCTIVE name tokens (words unique to a subspace among
- *      its siblings — "recipe"/"juice" vs the ubiquitous "guava").
+ *   1. Pick the SPACE — among spaces that have lexical evidence (≥1 marker hit),
+ *      take the strongest semantic match (gated by floor + margin). A space that
+ *      only resembles the page in embedding space, with no keyword corroboration,
+ *      is not eligible.
+ *   2. Pick the SUBSPACE — rank the winning space's subspaces by semantic + a
+ *      light keyword term, but PREFER one that has lexical evidence: a subspace
+ *      with zero marker hits can't win over an evidenced one (only a fallback if
+ *      none are evidenced).
  *
+ * Lexical evidence gates every stage; semantic ranks within each gated set.
  * Coffee subspaces never compete with Guava ones for the final pick.
  */
 export function findBestMatch(
@@ -105,7 +119,7 @@ export function findBestMatch(
   // ── Stage 1: pick the space by semantic similarity, gated by floor + margin ──
   // Semantic (not keyword) chooses the space — the logs show it's the reliable
   // signal, whereas generic markers ("storage", "brew") pull in the wrong space.
-  type SpaceCand = { members: SubspaceWithMarkers[]; semSpace: number; kw: number }
+  type SpaceCand = { members: SubspaceWithMarkers[]; semSpace: number; kw: number; hits: number }
   const spaces: SpaceCand[] = []
 
   for (const [spaceId, members] of bySpace) {
@@ -115,21 +129,33 @@ export function findBestMatch(
     const meanSem = sems.reduce((a, b) => a + b, 0) / (sems.length || 1)
     const semSpace = useSemantic ? semanticBySpace?.get(spaceId) ?? meanSem : 0
     const kwSpace = spaceKeywordCoverage(lower, nlpResult, members)
+    const hits = lexicalEvidenceCount(lower, nlpResult, members)
 
     if (debug) {
-      const hits = markerHitCount(lower, nlpResult, members)
       const semStr = useSemantic ? `sem ${(semSpace * 100).toFixed(0)}%, ` : ''
-      debug(`Space ${spaceId}: ${semStr}kw ${(kwSpace * 100).toFixed(0)}%, ${hits} marker hit${hits === 1 ? '' : 's'}, ${members.length} subspaces`)
+      debug(`Space ${spaceId}: ${semStr}kw ${(kwSpace * 100).toFixed(0)}%, ${hits} evidence term${hits === 1 ? '' : 's'}, ${members.length} subspaces`)
     }
 
-    spaces.push({ members, semSpace, kw: kwSpace })
+    spaces.push({ members, semSpace, kw: kwSpace, hits })
   }
 
-  // Rank by the reliable signal: semantic when available, keyword otherwise.
+  // Lexical gate (stage 1): a space is eligible only if at least one of its
+  // markers actually appears on the page. Semantic then ranks the eligible
+  // spaces — but a space that merely *looks* similar in embedding space with
+  // zero keyword corroboration can't win. The pre-gate guarantees ≥1 eligible,
+  // so the fallback to all is only ever a safety net.
+  const eligible = spaces.filter((c) => c.hits >= PREGATE_MIN_HITS)
+  const pool = eligible.length ? eligible : spaces
+  if (debug && eligible.length < spaces.length) {
+    debug(`  lexical gate: ${eligible.length}/${spaces.length} space(s) have keyword evidence`)
+  }
+
+  // Rank the eligible spaces by the reliable signal: semantic when available,
+  // keyword otherwise.
   const rankKey = (c: SpaceCand) => (useSemantic ? c.semSpace : c.kw)
-  spaces.sort((a, b) => rankKey(b) - rankKey(a))
-  const winner = spaces[0]
-  const runnerUp = spaces[1]
+  pool.sort((a, b) => rankKey(b) - rankKey(a))
+  const winner = pool[0]
+  const runnerUp = pool[1]
 
   if (useSemantic) {
     // Floor: the page must be genuinely on-topic for the best space.
@@ -170,13 +196,53 @@ export function hasKeywordEvidence(
     bySpace.set(s.spaceId, arr)
   }
   for (const members of bySpace.values()) {
-    if (markerHitCount(lower, nlpResult, members) >= PREGATE_MIN_HITS) return true
+    if (lexicalEvidenceCount(lower, nlpResult, members) >= PREGATE_MIN_HITS) return true
   }
   return false
 }
 
-/** How many DISTINCT markers of a space appear (at hit strength) on the page. */
-function markerHitCount(
+// Generic words that recur across product/feature descriptions and carry no
+// topical signal — excluded so they don't create false lexical evidence.
+const EVIDENCE_STOP = new Set([
+  'app', 'apps', 'tool', 'tools', 'system', 'systems', 'platform', 'platforms',
+  'hub', 'hubs', 'module', 'modules', 'management', 'managing', 'tracking',
+  'integrated', 'centralized', 'comprehensive', 'customizable', 'resource',
+  'resources', 'dashboard', 'dashboards', 'workflow', 'workflows', 'efficiency',
+  'coordination', 'submission', 'solution', 'solutions', 'feature', 'features',
+  'service', 'services', 'data', 'information', 'online', 'digital', 'various',
+  'with', 'and', 'the', 'for', 'from', 'this', 'that', 'your', 'their', 'using',
+])
+
+// The significant lexical terms that identify a subspace's topic: its marker
+// labels, plus the meaningful words mined from its name and description. Markers
+// generated by the space LLM are often multi-word feature phrases that never
+// appear verbatim on a page, so mining the name/description recovers the actual
+// topical vocabulary ("MBBS", "clinical", "curriculum") that a relevant page
+// will contain — the difference between the gate catching a real match or not.
+function subspaceTerms(s: SubspaceWithMarkers): string[] {
+  const terms = new Set<string>()
+  const mine = (t?: string) => {
+    if (!t) return
+    for (const w of t.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (w.length >= 4 && !EVIDENCE_STOP.has(w)) terms.add(w)
+    }
+  }
+  for (const m of s.markers) {
+    terms.add(m.label.toLowerCase()) // full phrase (multi-word boundary match)
+    mine(m.label)
+  }
+  mine(s.name)
+  mine(s.description)
+  return Array.from(terms)
+}
+
+/**
+ * How many DISTINCT topical terms of these subspaces appear on the page — the
+ * lexical-evidence signal that gates every stage. Counts marker labels AND words
+ * mined from subspace names/descriptions, so a page whose vocabulary matches the
+ * topic (but not the exact LLM-generated markers) still registers as evidence.
+ */
+function lexicalEvidenceCount(
   lower: string,
   nlpResult: NLPResult,
   members: SubspaceWithMarkers[],
@@ -184,14 +250,26 @@ function markerHitCount(
   const seen = new Set<string>()
   let hits = 0
   for (const s of members) {
-    for (const m of s.markers) {
-      const key = m.label.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      if (scoreMarker(lower, nlpResult, { label: m.label, weight: m.weight || 1 }) >= MARKER_HIT_STRENGTH) {
-        hits++
-      }
+    for (const term of subspaceTerms(s)) {
+      if (seen.has(term)) continue
+      seen.add(term)
+      if (scoreMarker(lower, nlpResult, { label: term, weight: 1 }) >= MARKER_HIT_STRENGTH) hits++
     }
+  }
+  return hits
+}
+
+/** How many of a subspace's OWN markers (not name/description) appear on the
+ *  page — the breadth of marker corroboration, used for the single-marker
+ *  de-rate. */
+function subspaceMarkerHits(lower: string, nlpResult: NLPResult, subspace: SubspaceWithMarkers): number {
+  const seen = new Set<string>()
+  let hits = 0
+  for (const m of subspace.markers) {
+    const key = m.label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (scoreMarker(lower, nlpResult, { label: m.label, weight: 1 }) >= MARKER_HIT_STRENGTH) hits++
   }
   return hits
 }
@@ -241,17 +319,28 @@ function rankSubspaces(
     return use.filter((t) => lower.includes(t)).length / use.length
   }
 
-  let best: (MatchResult & { nameScore: number }) | null = null
+  // Track two winners: the best subspace that has lexical evidence, and the best
+  // overall. We prefer the former (lexical gate); the latter is only a fallback.
+  let bestEvidenced: (MatchResult & { nameScore: number }) | null = null
+  let bestAny: (MatchResult & { nameScore: number }) | null = null
 
   for (const subspace of subspaces) {
-    const kw = scoreSubspace(text, nlpResult, subspace, distinctiveness)
+    const kwRaw = scoreSubspace(text, nlpResult, subspace, distinctiveness)
+    // De-rate a subspace corroborated by only one of its own markers — a lone
+    // distinctive term shouldn't outweigh a broadly-corroborated sibling.
+    const ownMarkerHits = subspaceMarkerHits(lower, nlpResult, subspace)
+    const kw = ownMarkerHits <= 1 ? kwRaw * SINGLE_MARKER_DERATE : kwRaw
     const sem = semanticById?.get(subspace.id) ?? 0
     const score = useSemantic ? SUBSPACE_SEMANTIC_WEIGHT * sem + (1 - SUBSPACE_SEMANTIC_WEIGHT) * kw : kw
     const ns = nameScore(subspace)
+    // Lexical evidence for THIS subspace: do any of its topical terms (markers +
+    // name/description words) appear on the page? Distinctiveness-weighted `kw`
+    // can be 0 even when a term hits, so gate on the raw evidence count instead.
+    const hits = lexicalEvidenceCount(lower, nlpResult, [subspace])
 
     if (debug) {
       const semStr = useSemantic ? `sem ${(sem * 100).toFixed(0)}%, ` : ''
-      debug(`  ${subspace.name}: ${(score * 100).toFixed(1)}% (${semStr}kw ${(kw * 100).toFixed(0)}%, name ${(ns * 100).toFixed(0)}%, ${subspace.markers.length} markers)`)
+      debug(`  ${subspace.name}: ${(score * 100).toFixed(1)}% (${semStr}kw ${(kw * 100).toFixed(0)}%, name ${(ns * 100).toFixed(0)}%, ${hits} evidence, ${subspace.markers.length} markers)`)
     }
 
     if (score <= 0) continue
@@ -263,12 +352,21 @@ function rankSubspaces(
       nameScore: ns,
     }
 
-    // Highest combined score wins — no name-based tiebreak. (That tiebreak sent
-    // a steeping page to "Varieties" just because the word "varieties" appeared,
-    // over a higher-scored "Brewing Techniques".)
-    if (!best || candidate.confidence > best.confidence) {
-      best = candidate
+    // Highest combined score wins within each bucket — no name-based tiebreak.
+    if (!bestAny || candidate.confidence > bestAny.confidence) bestAny = candidate
+    if (hits >= PREGATE_MIN_HITS && (!bestEvidenced || candidate.confidence > bestEvidenced.confidence)) {
+      bestEvidenced = candidate
     }
+  }
+
+  // Lexical gate (stage 2): prefer the best subspace that has keyword evidence
+  // over a higher-semantic one with NONE — so a Kryptonite page can't land in a
+  // "Lois Lane roles" subspace that shares zero vocabulary with it. Fall back to
+  // the best semantic subspace only when no subspace has any evidence (a
+  // space-generation gap), so the confirmed space match isn't lost.
+  const best = bestEvidenced ?? bestAny
+  if (debug && best) {
+    debug(`  → picked "${best.subspace.name}"${bestEvidenced ? ' (lexically corroborated)' : ' (semantic fallback — no subspace had keyword evidence)'}`)
   }
 
   if (best && best.confidence >= MATCH_THRESHOLD) {

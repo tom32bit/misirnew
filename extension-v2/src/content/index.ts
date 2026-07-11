@@ -115,7 +115,7 @@ async function checkPlatform(): Promise<void> {
 
   if (mode && !was) {
     log.debug(`Misir active (${mode})`)
-    initToolbar(handleSaveClick)
+    initToolbar(handleSaveClick, handleCorrect)
     showToolbar()
     // Only AI chats stream in new content that needs live re-matching; a static
     // web page is previewed once per navigation.
@@ -406,6 +406,54 @@ async function saveWebPage(): Promise<void> {
   }
 }
 
+// ── Match correction ─────────────────────────────────────────────────────────
+// The user picked the correct space·subspace in the toolbar. Gather the same
+// content a save would, and send it as a correction — the background saves it
+// there AND teaches that subspace this page's vocabulary (learned markers).
+async function handleCorrect(spaceId: number, subspaceId: number): Promise<void> {
+  if (contextDead || gpcOptOut()) return
+  setToolbarSaving(true)
+  try {
+    if (currentMode === 'aichat') {
+      const conversation = await extractConversation(window.location.href)
+      if (!conversation || conversation.messages.length === 0) return
+      const text = conversation.messages
+        .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+        .join('\n\n')
+      const wordCount = text.split(/\s+/).filter(Boolean).length
+      engagement.setWordCount(wordCount)
+      const result = await sendMessageWithRetry<CaptureResultMessage>({
+        type: 'CORRECT_MATCH', text, spaceId, subspaceId,
+        url: conversation.url, normalizedUrl: conversation.url,
+        domain: new URL(conversation.url).hostname, title: conversation.title,
+        contentHash: await sha256(text), wordCount,
+        contentSource: 'ai_chat', platform: conversation.platform,
+        ...engagement.snapshot(),
+      })
+      reportOutcome(result, 'correction')
+      if (result?.matched) savedTextLength = text.length
+    } else if (currentMode === 'web') {
+      const pageContent = await extractPageContent(document, window.location.href)
+      if (!pageContent || pageContent.wordCount < MIN_WEB_WORDS) return
+      engagement.setWordCount(pageContent.wordCount)
+      const result = await sendMessageWithRetry<CaptureResultMessage>({
+        type: 'CORRECT_MATCH', text: pageContent.textContent, spaceId, subspaceId,
+        url: pageContent.url, normalizedUrl: pageContent.normalizedUrl,
+        domain: pageContent.domain, title: pageContent.title,
+        contentHash: pageContent.contentHash, wordCount: pageContent.wordCount,
+        contentSource: 'web', platform: 'web',
+        ...engagement.snapshot(),
+      })
+      reportOutcome(result, 'correction')
+      if (result?.matched) savedTextLength = pageContent.textContent.length
+    }
+  } catch (err) {
+    log.error('Correction failed:', err)
+  } finally {
+    setToolbarSaving(false)
+  }
+}
+
 // ── Message listener ────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -497,6 +545,38 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return
   if ('misirWebEnabled' in changes || 'misirAiEnabled' in changes || 'misirBlocklist' in changes) {
     checkPlatform().catch((err) => log.error('settings-change recheck error:', err))
+  }
+  // The offline cache (spaces/subspaces/markers) was just refreshed — re-run the
+  // match on this tab so a space the user just created starts matching at once.
+  if ('misirCacheSyncedAt' in changes && currentMode) {
+    lastPreviewHash = null
+    matchComputed = false
+    schedulePreview(200)
+  }
+})
+
+// ── App → extension bridge ───────────────────────────────────────────────────
+// The Misir web app posts a message whenever the user changes their spaces so the
+// extension can refresh its offline cache immediately, instead of waiting for the
+// periodic (30-min) sync alarm. The re-sync then re-matches all open tabs (above).
+function isMisirAppOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin)
+    if (u.hostname === 'misir.app' || u.hostname.endsWith('.misir.app')) return true
+    if (u.hostname === 'localhost' && u.port === '3000') return true
+    return false
+  } catch {
+    return false
+  }
+}
+
+window.addEventListener('message', (event) => {
+  // Only accept same-window messages from the Misir app origin.
+  if (event.source !== window || !isMisirAppOrigin(event.origin)) return
+  const data = event.data as { source?: string; type?: string } | null
+  if (data?.source === 'misir-app' && data.type === 'MISIR_SPACES_CHANGED') {
+    log.debug('App signalled spaces changed — forcing cache sync')
+    sendMessageWithRetry({ type: 'FORCE_SYNC_CACHE' }).catch(() => {})
   }
 })
 

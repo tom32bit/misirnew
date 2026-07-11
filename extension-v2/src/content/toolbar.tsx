@@ -25,8 +25,17 @@ export interface MatchPreview {
   confidence?: number
 }
 
+// Spaces + their subspaces, for the correction picker.
+interface SpaceNode {
+  id: number
+  name: string
+  subspaces: Array<{ id: number; name: string }>
+}
+
 interface ToolbarProps {
   onSaveClick: () => void
+  /** Correct the match: save to the chosen subspace + teach it this page's terms. */
+  onCorrect: (spaceId: number, subspaceId: number) => Promise<void>
   isVisible: boolean
   isSaving: boolean
   outcome?: SaveOutcome | null
@@ -91,6 +100,26 @@ const CARD_CSS = `
 .misir-btn--spin svg { animation: misir-spin .9s linear infinite; }
 .misir-saved { margin-top: 12px; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--m-badge-fg); }
 .misir-saved svg { width: 15px; height: 15px; }
+.misir-fix {
+  margin-top: 9px; width: 100%; background: none; border: none; cursor: pointer;
+  font-size: 11.5px; font-weight: 500; color: var(--m-muted); text-align: center; padding: 2px;
+}
+.misir-fix:hover { color: var(--m-fg); text-decoration: underline; }
+.misir-correct { margin-top: 11px; display: flex; flex-direction: column; gap: 7px; }
+.misir-correct__label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--m-muted); }
+.misir-correct select {
+  width: 100%; height: 32px; padding: 0 8px; border-radius: 8px;
+  background: var(--m-bg); color: var(--m-fg); border: 1px solid var(--m-border);
+  font-size: 12.5px; font-family: inherit; cursor: pointer;
+}
+.misir-correct select:focus-visible { outline: none; border-color: var(--misir-accent); }
+.misir-correct__actions { display: flex; gap: 7px; margin-top: 2px; }
+.misir-correct__actions .misir-btn { margin-top: 0; }
+.misir-correct__cancel {
+  height: 36px; padding: 0 14px; border-radius: 9px; cursor: pointer;
+  background: transparent; color: var(--m-fg); border: 1px solid var(--m-border);
+  font-size: 13px; font-weight: 600; font-family: inherit;
+}
 @keyframes misir-spin { to { transform: rotate(360deg); } }
 @keyframes misir-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
@@ -99,8 +128,26 @@ const CARD_CSS = `
 }
 `
 
-function ToolbarComponent({ onSaveClick, isVisible, isSaving, outcome, preview, checking, hasSaved }: ToolbarProps) {
+function ToolbarComponent({ onSaveClick, onCorrect, isVisible, isSaving, outcome, preview, checking, hasSaved }: ToolbarProps) {
   const [showWarning, setShowWarning] = React.useState(false)
+  const [showPicker, setShowPicker] = React.useState(false)
+  const [tree, setTree] = React.useState<SpaceNode[]>([])
+  const [selSpace, setSelSpace] = React.useState<number | null>(null)
+  const [selSub, setSelSub] = React.useState<number | null>(null)
+  const [correcting, setCorrecting] = React.useState(false)
+
+  // Load the spaces tree the first time the picker opens.
+  React.useEffect(() => {
+    if (!showPicker || tree.length) return
+    chrome.runtime
+      .sendMessage({ type: 'GET_SPACES_TREE' })
+      .then((r: { spaces?: SpaceNode[] }) => {
+        const spaces = r?.spaces ?? []
+        setTree(spaces)
+        if (spaces[0]) setSelSpace(spaces[0].id)
+      })
+      .catch(() => {})
+  }, [showPicker, tree.length])
 
   const platformInfo = detectPlatform(window.location.href)
   const platform = platformInfo?.platform || 'web'
@@ -190,18 +237,69 @@ function ToolbarComponent({ onSaveClick, isVisible, isSaving, outcome, preview, 
           </div>
         )}
 
-        {saved ? (
-          <div className="misir-saved"><Check />Saved to your library</div>
-        ) : nomatch ? null : (
-          <button
-            className={`misir-btn${isSaving ? ' misir-btn--spin' : ''}`}
-            onClick={handleClick}
-            disabled={isSaving}
-            aria-label="Save this page to Misir"
-          >
-            {isSaving ? <Loader2 /> : <Save />}
-            {isSaving ? 'Saving…' : hasSaved ? 'Save the continuation' : 'Save to Misir'}
-          </button>
+        {showPicker ? (
+          <div className="misir-correct">
+            <div className="misir-correct__label">Choose the right space</div>
+            <select
+              value={selSpace ?? ''}
+              onChange={(e) => { setSelSpace(Number(e.target.value)); setSelSub(null) }}
+              aria-label="Space"
+            >
+              {tree.length === 0 && <option value="">No spaces cached</option>}
+              {tree.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+            </select>
+            <select
+              value={selSub ?? ''}
+              onChange={(e) => setSelSub(Number(e.target.value))}
+              aria-label="Subspace"
+            >
+              <option value="">Select subspace…</option>
+              {(tree.find((s) => s.id === selSpace)?.subspaces ?? []).map((su) => (
+                <option key={su.id} value={su.id}>{su.name}</option>
+              ))}
+            </select>
+            <div className="misir-correct__actions">
+              <button
+                className={`misir-btn${correcting ? ' misir-btn--spin' : ''}`}
+                disabled={!selSub || correcting}
+                onClick={async () => {
+                  if (selSpace == null || selSub == null) return
+                  setCorrecting(true)
+                  try { await onCorrect(selSpace, selSub) }
+                  finally { setCorrecting(false); setShowPicker(false) }
+                }}
+              >
+                {correcting ? <Loader2 /> : <Check />}
+                {correcting ? 'Saving…' : 'Save here'}
+              </button>
+              <button className="misir-correct__cancel" onClick={() => setShowPicker(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {saved ? (
+              <div className="misir-saved"><Check />Saved to your library</div>
+            ) : nomatch ? null : (
+              <button
+                className={`misir-btn${isSaving ? ' misir-btn--spin' : ''}`}
+                onClick={handleClick}
+                disabled={isSaving}
+                aria-label="Save this page to Misir"
+              >
+                {isSaving ? <Loader2 /> : <Save />}
+                {isSaving ? 'Saving…' : hasSaved ? 'Save the continuation' : 'Save to Misir'}
+              </button>
+            )}
+
+            {/* Correction affordance — the feedback loop entry point. */}
+            {!isSaving && (hasMatch || saved || nomatch) && (
+              <button className="misir-fix" onClick={() => setShowPicker(true)}>
+                {saved ? 'Saved to the wrong place? Fix it' : 'Wrong match? Choose the right space'}
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -217,12 +315,17 @@ let preview: MatchPreview | null = null
 let checking = false
 let hasSaved = false
 let outcomeTimer: ReturnType<typeof setTimeout> | null = null
-// Hold the real save handler at module scope so every re-render reuses it.
+// Hold the real handlers at module scope so every re-render reuses them.
 // (Previously each state change re-rendered with a no-op, disabling the button.)
 let onSaveClickRef: () => void = () => {}
+let onCorrectRef: (spaceId: number, subspaceId: number) => Promise<void> = async () => {}
 
-export function initToolbar(onSaveClick: () => void): void {
+export function initToolbar(
+  onSaveClick: () => void,
+  onCorrect: (spaceId: number, subspaceId: number) => Promise<void>,
+): void {
   onSaveClickRef = onSaveClick
+  onCorrectRef = onCorrect
   if (toolbarContainer) return
 
   toolbarContainer = document.createElement('div')
@@ -238,6 +341,7 @@ function renderToolbar(): void {
   toolbarRoot.render(
     <ToolbarComponent
       onSaveClick={onSaveClickRef}
+      onCorrect={onCorrectRef}
       isVisible={isVisible}
       isSaving={isSaving}
       outcome={outcome}

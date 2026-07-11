@@ -1,7 +1,7 @@
 import React from 'react'
 import {
   Settings, ExternalLink, Loader2, ShieldAlert, Globe, Sparkles,
-  Bookmark, Check, Plus, ScanLine,
+  Bookmark, Check, Plus, ScanLine, Terminal, RefreshCw, Copy,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { db, getPendingCount } from '@/lib/db'
@@ -39,6 +39,75 @@ export function PopupApp() {
   const [continuing, setContinuing] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  const [showLog, setShowLog] = React.useState(false)
+  const [logLines, setLogLines] = React.useState<string[]>([])
+  const [copied, setCopied] = React.useState(false)
+  // Smart (semantic) matching — first-run activation of the on-device model.
+  const [semanticReady, setSemanticReady] = React.useState<boolean | null>(null)
+  const [smartDismissed, setSmartDismissed] = React.useState(false)
+  const [enabling, setEnabling] = React.useState(false)
+  const [enableProgress, setEnableProgress] = React.useState(0)
+  const [enableError, setEnableError] = React.useState<string | null>(null)
+  const [justEnabled, setJustEnabled] = React.useState(false)
+
+  // Model download/init progress is broadcast from the offscreen document.
+  React.useEffect(() => {
+    const onMsg = (m: { type?: string; progress?: { progress?: number } }) => {
+      if (m?.type === 'SEMANTIC_PROGRESS' && typeof m.progress?.progress === 'number') {
+        setEnableProgress(Math.round(m.progress.progress))
+      }
+    }
+    chrome.runtime.onMessage.addListener(onMsg)
+    return () => chrome.runtime.onMessage.removeListener(onMsg)
+  }, [])
+
+  async function enableSmartMatching() {
+    if (enabling) return
+    setEnabling(true)
+    setEnableProgress(0)
+    setEnableError(null)
+    try {
+      const res = (await chrome.runtime.sendMessage({ type: 'SEMANTIC_ENABLE' })) as { ok?: boolean; error?: string }
+      if (res?.ok) {
+        setSemanticReady(true)
+        setJustEnabled(true)
+        setTimeout(() => setJustEnabled(false), 3500)
+      } else {
+        setEnableError(res?.error || 'Something went wrong. Please try again.')
+      }
+    } catch {
+      setEnableError('Couldn’t reach the model. Please try again.')
+    } finally {
+      setEnabling(false)
+    }
+  }
+
+  function dismissSmartMatching() {
+    setSmartDismissed(true)
+    chrome.storage.local.set({ misirSmartMatchDismissed: true }).catch(() => {})
+  }
+
+  async function fetchLogs() {
+    try {
+      const res = (await chrome.runtime.sendMessage({ type: 'GET_DEBUG_LOGS' })) as { logs?: string[] }
+      setLogLines(res?.logs ?? [])
+    } catch {
+      setLogLines([])
+    }
+  }
+
+  function toggleLog() {
+    const next = !showLog
+    setShowLog(next)
+    if (next) fetchLogs()
+  }
+
+  function copyLog() {
+    navigator.clipboard.writeText(logLines.join('\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
 
   React.useEffect(() => {
     loadInitialData()
@@ -63,6 +132,14 @@ export function PopupApp() {
       setTab(tabState.state)
       setFaviconUrl(tabState.favicon)
       setTabId(tabState.tabId)
+
+      // Smart-matching model status + whether the user dismissed the prompt.
+      const [semStatus, dismiss] = await Promise.all([
+        chrome.runtime.sendMessage({ type: 'SEMANTIC_STATUS' }).catch(() => ({ ready: false })),
+        chrome.storage.local.get('misirSmartMatchDismissed'),
+      ])
+      setSemanticReady(!!(semStatus as { ready?: boolean })?.ready)
+      setSmartDismissed(!!dismiss.misirSmartMatchDismissed)
       try {
         await apiGetConsent()
       } catch {
@@ -164,6 +241,17 @@ export function PopupApp() {
       </div>
       <Divider />
 
+      <SmartMatchBanner
+        ready={semanticReady}
+        dismissed={smartDismissed}
+        enabling={enabling}
+        progress={enableProgress}
+        error={enableError}
+        justEnabled={justEnabled}
+        onEnable={enableSmartMatching}
+        onDismiss={dismissSmartMatching}
+      />
+
       {/* On this tab */}
       <div style={{ padding: '16px 17px' }}>
         <h2 style={SECTION_LABEL}>On this tab</h2>
@@ -222,9 +310,46 @@ export function PopupApp() {
       </div>
       <Divider />
 
+      {/* Match log (diagnostics) */}
+      {showLog && (
+        <>
+          <div style={{ padding: '13px 15px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+              <span style={SECTION_LABEL}>Match log</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <MiniBtn onClick={fetchLogs} icon={<RefreshCw size={11} />}>Refresh</MiniBtn>
+                <MiniBtn onClick={copyLog} icon={copied ? <Check size={11} /> : <Copy size={11} />}>
+                  {copied ? 'Copied' : 'Copy'}
+                </MiniBtn>
+              </div>
+            </div>
+            <div style={{
+              maxHeight: 190, overflow: 'auto', background: C.app, border: `1px solid ${C.border}`,
+              borderRadius: 9, padding: '9px 10px',
+              fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 10.5, lineHeight: 1.55,
+            }}>
+              {logLines.length ? (
+                logLines.map((l, i) => (
+                  <div key={i} style={{
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    color: l.startsWith('→') ? C.accent2
+                      : l.startsWith('Matching') || l.startsWith('No keyword') ? C.text2
+                        : C.text3,
+                  }}>{l}</div>
+                ))
+              ) : (
+                <span style={{ color: C.text4 }}>No recent match yet — reload the page to run one, then Refresh.</span>
+              )}
+            </div>
+          </div>
+          <Divider />
+        </>
+      )}
+
       {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '13px 13px 15px' }}>
         <FootBtn icon={<Settings size={14} />} onClick={() => chrome.runtime.openOptionsPage()}>Settings</FootBtn>
+        <FootBtn icon={<Terminal size={14} />} onClick={toggleLog}>{showLog ? 'Hide log' : 'Logs'}</FootBtn>
         <span style={{ flex: 1 }} />
         <FootBtn icon={<ExternalLink size={14} />} iconRight onClick={() => chrome.tabs.create({ url: 'https://misir.app' })}>
           Open app
@@ -424,6 +549,115 @@ function saveBtnStyle(busy: boolean): React.CSSProperties {
 
 function Divider() {
   return <div style={{ height: 1, background: C.border }} />
+}
+
+// First-run activation of the on-device semantic model. Prominent until the user
+// enables it (matching's core value) or dismisses it (keyword-only fallback).
+function SmartMatchBanner({
+  ready, dismissed, enabling, progress, error, justEnabled, onEnable, onDismiss,
+}: {
+  ready: boolean | null
+  dismissed: boolean
+  enabling: boolean
+  progress: number
+  error: string | null
+  justEnabled: boolean
+  onEnable: () => void
+  onDismiss: () => void
+}) {
+  // Brief success confirmation after enabling.
+  if (justEnabled) {
+    return (
+      <>
+        <div style={{ padding: '14px 15px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 13px', borderRadius: 12,
+            background: C.goodSoft, border: '1px solid rgba(131,173,132,0.28)',
+          }}>
+            <span style={{ width: 22, height: 22, flex: 'none', borderRadius: '50%', background: 'rgba(131,173,132,0.2)', color: C.good, display: 'grid', placeItems: 'center' }}>
+              <Check size={13} />
+            </span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>Smart matching is on</div>
+              <div style={{ fontSize: 11.5, color: C.text4 }}>Pages now match by meaning, on-device.</div>
+            </div>
+          </div>
+        </div>
+        <Divider />
+      </>
+    )
+  }
+
+  // Only prompt when we know the model is off and the user hasn't dismissed it.
+  if (ready !== false || dismissed) return null
+
+  return (
+    <>
+      <div style={{ padding: '14px 15px' }}>
+        <div style={{ borderRadius: 13, background: C.accentSoft, border: '1px solid rgba(217,119,87,0.22)', padding: '14px 14px 15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+            <span style={{ width: 26, height: 26, flex: 'none', borderRadius: 8, background: 'rgba(217,119,87,0.18)', color: C.accent2, display: 'grid', placeItems: 'center' }}>
+              <Sparkles size={15} />
+            </span>
+            <span style={{ fontFamily: SERIF, fontSize: 15, color: C.text, letterSpacing: '-0.005em' }}>Turn on smart matching</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: C.text2 }}>
+            Match pages to your spaces by <b style={{ color: C.text }}>meaning</b>, not just keywords. A one-time ~140 MB download that runs <b style={{ color: C.text }}>entirely on your device</b> — nothing is uploaded.
+          </p>
+          {error && <p style={{ margin: '9px 1px 0', fontSize: 11.5, lineHeight: 1.45, color: C.danger }}>{error}</p>}
+          {enabling ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ height: 5, borderRadius: 5, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.max(4, progress)}%`, background: C.accent, borderRadius: 5, transition: 'width .25s' }} />
+              </div>
+              <div style={{ marginTop: 7, fontSize: 11.5, color: C.text3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Loader2 size={12} className="animate-spin" />
+                {progress > 0 ? `Downloading… ${progress}%` : 'Starting download…'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, marginTop: 13 }}>
+              <button
+                onClick={onEnable}
+                style={{
+                  flex: 1, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 10, background: C.accent,
+                  color: '#fff', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                }}
+              >
+                {error ? 'Try again' : 'Enable'}
+              </button>
+              <button
+                onClick={onDismiss}
+                style={{
+                  border: `1px solid ${C.border2}`, cursor: 'pointer', padding: '9px 13px', borderRadius: 10,
+                  background: 'transparent', color: C.text2, fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                }}
+              >
+                Not now
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <Divider />
+    </>
+  )
+}
+
+function MiniBtn({ icon, onClick, children }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 7,
+        fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+        background: 'transparent', border: `1px solid ${C.border2}`, color: C.text2,
+      }}
+    >
+      {icon}{children}
+    </button>
+  )
 }
 
 function SyncPill({ lastSyncedMs }: { lastSyncedMs: number | null }) {

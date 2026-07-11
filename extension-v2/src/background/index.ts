@@ -5,7 +5,7 @@
 
 import { createConsola } from 'consola'
 import { db, getSubspacesWithMarkers, getPendingCount, clearLocalData } from '@/lib/db'
-import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent } from '@/lib/api'
+import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
 import { processText } from '@/lib/nlp'
 import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
 import type { MatchResult } from '@/lib/matching'
@@ -17,6 +17,9 @@ import type {
   CaptureAIChatMessage,
   UpdateEngagementMessage,
   CaptureResultMessage,
+  ContentSource,
+  PlatformType,
+  EngagementLevel,
 } from '@/lib/types'
 
 const log = createConsola({ level: 4 }).withTag('background')
@@ -94,6 +97,14 @@ async function syncCache(): Promise<void> {
     })
 
     log.info(`Cache synced — ${spaces.length} spaces, ${subspaces.length} subspaces, ${markers.length} markers`)
+
+    // Signal all content scripts that the cache changed so open tabs re-run their
+    // match immediately (e.g. against a space the user just created in the app).
+    try {
+      await chrome.storage.local.set({ misirCacheSyncedAt: Date.now() })
+    } catch {
+      /* best-effort */
+    }
   } catch (err: any) {
     log.error('syncCache failed:', err?.message || err)
   }
@@ -401,6 +412,142 @@ async function handlePreviewMatch(text: string): Promise<CaptureResultMessage> {
   }
 }
 
+// ── Match correction (feedback loop) ─────────────────────────────────────────
+// When the user overrides the match and picks the correct subspace, we (a) save
+// the artifact there, and (b) teach that subspace the page's salient vocabulary
+// as low-weight "learned" markers — so next time a similar page matches on its
+// own. This is how the markers get better than the LLM's original feature fluff.
+
+interface CorrectMatchMessage {
+  type: 'CORRECT_MATCH'
+  text: string
+  spaceId: number
+  subspaceId: number
+  url: string
+  normalizedUrl: string
+  domain: string
+  title?: string
+  contentHash: string
+  wordCount: number
+  contentSource: ContentSource
+  platform: PlatformType
+  engagementLevel?: EngagementLevel
+  dwellTimeMs?: number
+  scrollDepth?: number
+  readingDepth?: number
+  baseWeight?: number
+}
+
+// Salient candidate terms from a corrected page → learned markers. Prefers named
+// entities, then the top content lemmas, filtered of noise.
+function extractCandidateTerms(text: string): string[] {
+  const r = processText(text)
+  const stop = new Set([
+    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your', 'their', 'using',
+    'about', 'have', 'will', 'which', 'into', 'more', 'than', 'then', 'they', 'them',
+    'also', 'such', 'these', 'those', 'other', 'some', 'what', 'when', 'where', 'while',
+    'been', 'being', 'page', 'site', 'user', 'assistant', 'http', 'https', 'www', 'com',
+  ])
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const t of [...r.entities.map((e) => e.toLowerCase()), ...r.keywords]) {
+    const w = t.trim().toLowerCase()
+    if (w.length < 4 || w.length > 40) continue
+    if (!/^[a-z][a-z0-9 -]*$/.test(w)) continue
+    if (stop.has(w) || seen.has(w)) continue
+    seen.add(w)
+    out.push(w)
+    if (out.length >= 8) break
+  }
+  return out
+}
+
+async function handleCorrection(msg: CorrectMatchMessage): Promise<CaptureResultMessage> {
+  const subspaces = await getSubspacesWithMarkers()
+  const chosen = subspaces.find((s) => s.id === msg.subspaceId)
+  const spaceId = msg.spaceId ?? chosen?.spaceId
+  if (!spaceId) return { matched: false }
+
+  const capturedAt = new Date().toISOString()
+  const payload = {
+    url: msg.url,
+    normalized_url: msg.normalizedUrl,
+    domain: msg.domain,
+    title: redactPII(msg.title),
+    extracted_text: redactPII(msg.text),
+    content_hash: msg.contentHash,
+    word_count: msg.wordCount,
+    content_source: msg.contentSource,
+    platform: msg.platform,
+    engagement_level: msg.engagementLevel ?? 'active',
+    dwell_time_ms: msg.dwellTimeMs ?? 0,
+    scroll_depth: msg.scrollDepth ?? 0,
+    reading_depth: msg.readingDepth ?? 0,
+    space_id: spaceId,
+    subspace_id: msg.subspaceId,
+    matched_marker_ids: [],
+    tags: [],
+    metadata: { corrected: true },
+    captured_at: capturedAt,
+  }
+
+  let remoteId: number | null = null
+  try {
+    remoteId = await pushArtifactToBackend(payload)
+  } catch (err: any) {
+    if (err?.name === 'ConsentRequiredError') {
+      await noteConsentNeeded(err.purpose)
+      return { matched: false }
+    }
+    log.error('Correction capture failed:', errText(err))
+  }
+
+  if (remoteId === null) {
+    // Queue locally so a correction isn't lost when the backend is unreachable.
+    try {
+      await db.pendingArtifacts.add({
+        userId: 'pending', spaceId, subspaceId: msg.subspaceId,
+        title: redactPII(msg.title), url: msg.url, normalizedUrl: msg.normalizedUrl,
+        domain: msg.domain, extractedText: redactPII(msg.text), contentHash: msg.contentHash,
+        wordCount: msg.wordCount, contentSource: msg.contentSource,
+        engagementLevel: msg.engagementLevel ?? 'active', dwellTimeMs: msg.dwellTimeMs ?? 0,
+        scrollDepth: msg.scrollDepth ?? 0, readingDepth: msg.readingDepth ?? 0,
+        baseWeight: msg.baseWeight ?? 2.0, decayRate: 'medium', relevance: 1,
+        matchedMarkerIds: [], metadata: { corrected: true, platform: msg.platform },
+        capturedAt: new Date(capturedAt), syncAttempts: 1,
+      })
+    } catch (err) {
+      log.error('Correction queue failed:', errText(err))
+    }
+  } else {
+    await writeSyncStatus()
+  }
+
+  // Teach the subspace this page's vocabulary, then resync so the new markers
+  // reach matching on all open tabs.
+  const terms = extractCandidateTerms(msg.text)
+  if (terms.length) {
+    try {
+      const res = await apiLearnMarkers(spaceId, msg.subspaceId, terms)
+      matchLog.info(
+        `Learned ${res.added.length} marker(s) for "${chosen?.name ?? 'subspace'}": ${res.added.map((m) => m.label).join(', ')}`,
+      )
+    } catch (err) {
+      log.warn('Learn markers failed:', errText(err))
+    }
+  }
+  await syncCache()
+
+  return {
+    matched: true,
+    remoteId: remoteId ?? undefined,
+    subspaceId: msg.subspaceId,
+    spaceName: (await db.spaces.get(spaceId))?.name,
+    subspaceName: chosen?.name,
+    confidence: 1,
+  }
+}
+
 // ── Engagement update ────────────────────────────────────────────────────────
 
 async function handleUpdateEngagement(msg: UpdateEngagementMessage): Promise<void> {
@@ -680,7 +827,9 @@ async function computeMatch(
   // page contains none of any space's markers, it can't match — bail without
   // paying for on-device inference.
   if (!hasKeywordEvidence(text, nlpResult, subspaces)) {
-    matchLog.info(`No keyword evidence across ${subspaces.length} subspace(s) — skipped "${preview}…"`)
+    const line = `No keyword evidence across ${subspaces.length} subspace(s) — skipped "${preview}…"`
+    matchLog.info(line)
+    dbg(line)
     return null
   }
 
@@ -688,9 +837,9 @@ async function computeMatch(
   const semantic = await semanticScores(text, spaces, subspaces)
   const mode = semantic ? 'semantic + keyword' : 'keyword-only'
 
-  matchLog.info(
-    `Matching (${mode}) across ${subspaces.length} subspace(s) — "${preview}…"`,
-  )
+  const header = `Matching (${mode}) across ${subspaces.length} subspace(s) — "${preview}…"`
+  matchLog.info(header)
+  dbg(header)
 
   const lines: string[] = []
   const match = findBestMatch(text, nlpResult, subspaces, {
@@ -706,15 +855,15 @@ async function computeMatch(
   for (const l of lines) matchLog.log(l)
 
   if (match) {
-    matchLog.success(
-      `→ ${match.subspace.name} @ ${(match.confidence * 100).toFixed(1)}% (space ${match.subspace.spaceId}, markers ${match.matchedMarkerIds.length})`,
-    )
+    const line = `→ ${match.subspace.name} @ ${(match.confidence * 100).toFixed(1)}% (space ${match.subspace.spaceId}, markers ${match.matchedMarkerIds.length})`
+    matchLog.success(line)
+    dbg(line)
   } else {
-    matchLog.warn(
-      semantic
-        ? '→ no match (every subspace below the semantic floor / threshold)'
-        : '→ no match (every subspace below the keyword threshold)',
-    )
+    const line = semantic
+      ? '→ no match (every subspace below the semantic floor / threshold)'
+      : '→ no match (every subspace below the keyword threshold)'
+    matchLog.warn(line)
+    dbg(line)
   }
 
   return match
@@ -842,6 +991,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
+  // Spaces + subspaces for the toolbar's correction picker (from the Dexie cache).
+  if (message.type === 'GET_SPACES_TREE') {
+    Promise.all([db.spaces.toArray(), db.subspaces.toArray()])
+      .then(([spaces, subs]) => {
+        const bySpace = new Map<number, Array<{ id: number; name: string }>>()
+        for (const s of subs) {
+          const arr = bySpace.get(s.spaceId) ?? []
+          arr.push({ id: s.id, name: s.name })
+          bySpace.set(s.spaceId, arr)
+        }
+        sendResponse({
+          spaces: spaces.map((sp) => ({ id: sp.id, name: sp.name, subspaces: bySpace.get(sp.id) ?? [] })),
+        })
+      })
+      .catch(() => sendResponse({ spaces: [] }))
+    return true
+  }
+
+  if (message.type === 'CORRECT_MATCH') {
+    handleCorrection(message as CorrectMatchMessage)
+      .then(sendResponse)
+      .catch((err) => { log.error('Correction error:', errText(err)); sendResponse({ matched: false }) })
+    return true
+  }
+
   if (message.type === 'UPDATE_ENGAGEMENT') {
     handleUpdateEngagement(message as UpdateEngagementMessage).catch((err) =>
       log.error('Engagement update error:', err),
@@ -925,6 +1099,39 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 })
 
+// ── Smart-matching nudge badge ───────────────────────────────────────────────
+// Draw a subtle dot on the toolbar icon while the on-device model is off (and
+// the user hasn't dismissed the prompt), so they discover the popup's one-time
+// "Enable smart matching" step even if they never open it on their own.
+
+async function updateSmartMatchBadge(): Promise<void> {
+  try {
+    const { misirModelReady, misirSmartMatchDismissed } = await chrome.storage.local.get([
+      'misirModelReady',
+      'misirSmartMatchDismissed',
+    ])
+    if (!misirModelReady && !misirSmartMatchDismissed) {
+      await chrome.action.setBadgeText({ text: '●' })
+      await chrome.action.setBadgeBackgroundColor({ color: '#D97757' })
+    } else {
+      await chrome.action.setBadgeText({ text: '' })
+    }
+  } catch {
+    /* action API unavailable — non-fatal */
+  }
+}
+
+// Keep the badge in sync when the model is enabled or the prompt is dismissed.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && ('misirModelReady' in changes || 'misirSmartMatchDismissed' in changes)) {
+    updateSmartMatchBadge()
+  }
+})
+
+chrome.runtime.onInstalled.addListener(() => {
+  updateSmartMatchBadge()
+})
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function initializeServiceWorker(): Promise<void> {
@@ -935,6 +1142,8 @@ async function initializeServiceWorker(): Promise<void> {
   ])
   if (!retryAlarm) chrome.alarms.create('retryPending', { periodInMinutes: 5 })
   if (!syncAlarm) chrome.alarms.create('syncCache', { periodInMinutes: 30 })
+
+  updateSmartMatchBadge()
 
   try {
     log.debug('Service Worker initializing...')
