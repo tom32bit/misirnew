@@ -1,21 +1,34 @@
 "use client"
 
 /**
- * Drives the sidebar + mobile-nav badge counts.
+ * Drives the sidebar + mobile-nav badge counts from real, persisted read state.
  *
- * Backend doesn't expose per-conversation unread flags yet, so for now we
- * proxy "Inbox" as the count of conversations updated in the last 24h
- * (a stable, useful approximation). "Notifications" counts active critical
- * nudges. Both values are scope-aware: when a specific space is open, the
- * count is filtered to that space.
+ * "Inbox" counts conversations with activity newer than the user last opened
+ * them (updated_at > last_read_at). "Notifications" counts active nudges the
+ * user hasn't viewed yet (seen_at is null). Both are scope-aware: when a
+ * specific space is open, counts are filtered to that space.
  */
 
 import { useMemo } from "react"
 import { useInbox } from "./useInbox"
 import { useNudges } from "./useNudges"
 import { useParams } from "next/navigation"
+import type { Conversation, Nudge } from "@/lib/api/types"
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
+/** A conversation is unread if it has activity since the user last opened it. */
+export function isConversationUnread(c: Conversation): boolean {
+  const updated = Date.parse(c.updated_at)
+  if (!Number.isFinite(updated)) return false
+  const readAt = c.last_read_at ? Date.parse(c.last_read_at) : NaN
+  // Never opened → unread. Otherwise unread only if newer activity arrived.
+  if (!Number.isFinite(readAt)) return true
+  return updated > readAt
+}
+
+/** A notification is unread until the user has viewed the notifications list. */
+export function isNudgeUnread(n: Nudge): boolean {
+  return n.status === "active" && !n.seen_at
+}
 
 export function useUnreadCounts() {
   const params = useParams<{ scope?: string }>()
@@ -31,15 +44,8 @@ export function useUnreadCounts() {
   )
 
   return useMemo(() => {
-    const now = Date.now()
-    const inboxUnread =
-      (inbox.data ?? []).filter((c) => {
-        const t = Date.parse(c.updated_at)
-        return Number.isFinite(t) && now - t < ONE_DAY_MS
-      }).length
-
-    const notifCritical = (nudges.data ?? []).filter((n) => n.priority >= 3).length
-
-    return { inboxUnread, notifCritical }
+    const inboxUnread = (inbox.data ?? []).filter(isConversationUnread).length
+    const notifUnread = (nudges.data ?? []).filter(isNudgeUnread).length
+    return { inboxUnread, notifUnread }
   }, [inbox.data, nudges.data])
 }

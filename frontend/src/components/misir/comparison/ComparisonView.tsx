@@ -9,85 +9,55 @@ import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import type {
   DashboardSource,
-  PlatformType,
   Space,
 } from "@/lib/api/types"
 import { TensionTable } from "./TensionTable"
-import { SourceCard, type SourceKey } from "./SourceCard"
+import { SourceCard } from "./SourceCard"
 import { SynthesisGrid } from "./SynthesisGrid"
 
 type Scope = "all" | number
 
-const SOURCE_COLORS: Record<SourceKey, string> = {
-  claude: "#D97757",
-  gemini: "#2A4A7A",
-  web: "#2A6A4A",
-}
-
-const AI_PLATFORMS: PlatformType[] = [
-  "claude",
-  "chatgpt",
-  "perplexity",
-  "deepseek",
-  "grok",
-  "copilot",
-  "notebooklm",
-  "kimi",
-]
-
-function bucket(platform: string): SourceKey {
-  const p = platform.toLowerCase()
-  if (p === "gemini") return "gemini"
-  if ((AI_PLATFORMS as string[]).includes(p)) return "claude"
-  return "web"
-}
+// Fallback colour if the backend ever emits a source without one.
+const FALLBACK_SOURCE_COLOR = "#8A8A82"
 
 export type SourceVM = {
-  key: SourceKey
+  /** The real platform/source key from the backend (chatgpt, perplexity, web…). */
+  key: string
   label: string
   count: number
-  /** Largest single-platform summary inside this bucket. */
+  color: string
   summary?: string
   findings: { text: string; conf: number }[]
   signal?: string
-  /** Platforms contributing to this bucket (used in label). */
-  platforms: string[]
 }
 
-function aggregateSources(sources: DashboardSource[]): SourceVM[] {
-  const map = new Map<SourceKey, SourceVM>()
+// One card per real source the backend reports — no bucketing, so a ChatGPT or
+// Perplexity capture is labelled and coloured as itself, not folded into
+// "Claude". Merge defensively by key in case the backend ever repeats one.
+function toSourceVMs(sources: DashboardSource[]): SourceVM[] {
+  const map = new Map<string, SourceVM>()
   for (const s of sources) {
-    const key = bucket(s.key)
-    const existing = map.get(key) ?? {
-      key,
-      label: keyLabel(key),
-      count: 0,
-      summary: undefined,
-      findings: [],
-      signal: undefined,
-      platforms: [],
+    const existing = map.get(s.key)
+    if (existing) {
+      existing.count += s.artifacts
+      if (s.topInsight && !existing.summary) existing.summary = s.topInsight
+      if (s.themes?.length) existing.findings.push(...s.themes)
+      if (s.signal && !existing.signal) existing.signal = s.signal
+    } else {
+      map.set(s.key, {
+        key: s.key,
+        label: s.label || s.key,
+        count: s.artifacts,
+        color: s.color || FALLBACK_SOURCE_COLOR,
+        summary: s.topInsight || undefined,
+        findings: s.themes ? [...s.themes] : [],
+        signal: s.signal || undefined,
+      })
     }
-    existing.count += s.artifacts
-    if (s.topInsight && (!existing.summary || s.artifacts > existing.count / 2)) {
-      existing.summary = s.topInsight
-    }
-    if (s.themes && s.themes.length > 0) {
-      existing.findings.push(...s.themes)
-    }
-    if (s.signal && !existing.signal) existing.signal = s.signal
-    if (!existing.platforms.includes(s.key)) {
-      existing.platforms.push(s.key)
-    }
-    map.set(key, existing)
   }
-  // Stable order: Claude, Gemini, Web.
-  return (["claude", "gemini", "web"] as const)
-    .map((k) => map.get(k))
-    .filter((v): v is SourceVM => !!v && v.count > 0)
-}
-
-function keyLabel(k: SourceKey): string {
-  return { claude: "Claude", gemini: "Gemini", web: "Web" }[k]
+  return Array.from(map.values())
+    .filter((v) => v.count > 0)
+    .sort((a, b) => b.count - a.count)
 }
 
 export function ComparisonView({ scope }: { scope: Scope }) {
@@ -107,7 +77,7 @@ export function ComparisonView({ scope }: { scope: Scope }) {
   const dashboard = useDashboard(effectiveSpaceId, period, tzOffset, date)
   const payload = dashboard.data
   const sources = useMemo(
-    () => aggregateSources(payload?.sources ?? []),
+    () => toSourceVMs(payload?.sources ?? []),
     [payload?.sources],
   )
   const totalCaptures = sources.reduce((s, r) => s + r.count, 0)
@@ -136,21 +106,17 @@ export function ComparisonView({ scope }: { scope: Scope }) {
       {payload && (
         <TensionTable
           sources={sources}
-          edge={payload.key_tension?.edge ?? null}
+          tension={payload.key_tension}
         />
       )}
 
       {sources.length > 0 ? (
         <div
           className="grid gap-3.5 mobile:grid-cols-1"
-          style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+          style={{ gridTemplateColumns: `repeat(${Math.min(3, sources.length)}, minmax(0, 1fr))` }}
         >
           {sources.map((s) => (
-            <SourceCard
-              key={s.key}
-              source={s}
-              color={SOURCE_COLORS[s.key]}
-            />
+            <SourceCard key={s.key} source={s} color={s.color} />
           ))}
         </div>
       ) : (

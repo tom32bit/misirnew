@@ -84,6 +84,10 @@ class CaptureRequest(BaseModel):
     scroll_depth: float = 0.0
     reading_depth: float = 0.0
     space_id: Optional[int] = None
+    # The specific subspace the extension matched on-device (optional — a capture
+    # can be confident about the space but not a subspace). Validated to belong to
+    # space_id server-side; dropped to NULL if it doesn't.
+    subspace_id: Optional[int] = None
     matched_marker_ids: List[int] = Field(default_factory=list, max_length=500)
     tags: List[str] = Field(default_factory=list, max_length=100)
     metadata: dict = {}
@@ -139,6 +143,25 @@ def capture_artifact(
         if not owned.data:
             _log.warning("capture_artifact space_not_found", space_id=space_id, user_id=user_id)
             space_id = None
+    # Whether the space the extension asked for was actually honoured — surfaced
+    # in the response so the extension knows if its "matched" claim held.
+    space_accepted = body.space_id is None or space_id is not None
+
+    # Validate subspace_id the same way: it must belong to the (owned) space, or
+    # we drop it. A subspace without a surviving space makes no sense either.
+    subspace_id = body.subspace_id
+    if subspace_id is not None:
+        if space_id is None:
+            subspace_id = None
+        else:
+            sub_owned = (
+                db.schema("misir").table("subspace")
+                .select("id").eq("id", subspace_id).eq("space_id", space_id)
+                .execute()
+            )
+            if not sub_owned.data:
+                _log.warning("capture_artifact subspace_not_found", subspace_id=subspace_id, space_id=space_id, user_id=user_id)
+                subspace_id = None
 
     base_weight = body.engagement_level.base_weight
 
@@ -150,6 +173,7 @@ def capture_artifact(
     artifact_data = {
         "user_id": user_id,
         "space_id": space_id,
+        "subspace_id": subspace_id,
         "captured_at": captured_now,
         "url": body.url,
         "normalized_url": body.normalized_url,
@@ -221,6 +245,10 @@ def capture_artifact(
             word_count=body.word_count,
         )
 
+    # Return the artifact row augmented with the resolved space/subspace and
+    # whether the requested space survived validation, so the extension can trust
+    # (or correct) its local "matched" state. `id` stays for backwards-compat.
+    artifact["space_accepted"] = space_accepted
     return artifact
 
 
@@ -342,7 +370,7 @@ def list_artifacts(
         db.schema("misir")
         .table("artifact")
         .select(
-            "id,user_id,space_id,url,normalized_url,domain,title,"
+            "id,user_id,space_id,subspace_id,url,normalized_url,domain,title,"
             "content_hash,word_count,content_source,platform,engagement_level,"
             "dwell_time_ms,scroll_depth,reading_depth,base_weight,"
             "matched_marker_ids,metadata,captured_at,updated_at,"

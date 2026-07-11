@@ -213,10 +213,21 @@ export interface ArtifactPayload {
   scroll_depth: number
   reading_depth: number
   space_id?: number
+  /** The specific subspace matched on-device; validated server-side. */
+  subspace_id?: number
   matched_marker_ids: number[]
   tags: string[]
   metadata: Record<string, unknown>
   captured_at: string
+}
+
+// What POST /artifacts/capture actually returns: the stored row (snake_case) plus
+// `space_accepted` — whether the space_id we sent survived server validation.
+export interface CaptureApiResult {
+  id: number
+  space_id: number | null
+  subspace_id: number | null
+  space_accepted?: boolean
 }
 
 // Backend cache response

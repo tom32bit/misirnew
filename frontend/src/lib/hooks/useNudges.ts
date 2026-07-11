@@ -21,3 +21,13 @@ export function useDismissNudge() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["nudges"] }),
   })
 }
+
+/** Mark active nudges seen (viewed the notifications list) — clears the badge. */
+export function useMarkNudgesSeen() {
+  const k = useApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (spaceId?: number) => nudgesApi.markSeen(k, spaceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["nudges"] }),
+  })
+}

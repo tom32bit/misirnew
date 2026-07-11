@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { Button } from "@/components/misir/primitives/Button"
 import {
@@ -15,7 +16,7 @@ import {
   type SegmentOption,
 } from "@/components/misir/primitives/FilterBar"
 import { SpaceTag } from "@/components/misir/primitives/Tag"
-import { useNudges } from "@/lib/hooks/useNudges"
+import { useNudges, useMarkNudgesSeen } from "@/lib/hooks/useNudges"
 import { useGaps } from "@/lib/hooks/useGaps"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { getSpaceColor } from "@/lib/constants/space-colors"
@@ -73,6 +74,10 @@ export function NotificationsView({ scope }: { scope: Scope }) {
   // Nudges always available; gaps fetched per-space only.
   const nudges = useNudges(isAll ? { status: "active" } : { status: "active", spaceId: scope })
   const gaps = useGaps(isAll ? null : scope)
+
+  // "Mark all read" marks the active nudges seen — clears the sidebar unread
+  // badge. Explicit (not on mount) so the button has a visible effect.
+  const markSeen = useMarkNudgesSeen()
 
   const [filter, setFilter] = useState<Severity>(
     (search.get("f") as Severity) ?? "all",
@@ -149,14 +154,20 @@ export function NotificationsView({ scope }: { scope: Scope }) {
   const topNudgeSpace =
     topNudge && spaces.find((s) => s.id === topNudge.space_id)
 
+  const unreadCount = (nudges.data ?? []).filter((n) => !n.seen_at).length
+
   const markAllRead = () => {
-    // No backend endpoint; just toast as a stub.
-    // Importing toast lazily so we don't add another top-level dep.
-    import("sonner").then(({ toast }) =>
-      toast.message("Coming soon", {
-        description: "Mark all read will be available in the next update.",
-      }),
-    )
+    if (markSeen.isPending) return
+    markSeen.mutate(isAll ? undefined : (scope as number), {
+      onSuccess: () =>
+        toast.success("All caught up", {
+          description: "Notifications marked as read.",
+        }),
+      onError: () =>
+        toast.error("Couldn't mark as read", {
+          description: "Please try again in a moment.",
+        }),
+    })
   }
 
   return (
@@ -165,8 +176,16 @@ export function NotificationsView({ scope }: { scope: Scope }) {
         title="Notifications"
         small="Alerts, nudges, and gaps Misir is watching"
         right={
-          <Button variant="ghost" onClick={markAllRead}>
-            Mark all read
+          <Button
+            variant="ghost"
+            onClick={markAllRead}
+            disabled={markSeen.isPending || unreadCount === 0}
+          >
+            {markSeen.isPending
+              ? "Marking…"
+              : unreadCount > 0
+                ? `Mark all read (${unreadCount})`
+                : "All read"}
           </Button>
         }
       />

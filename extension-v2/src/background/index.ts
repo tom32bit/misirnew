@@ -123,7 +123,13 @@ function clampPayload(payload: any): any {
 
 async function pushArtifactToBackend(payload: any): Promise<number | null> {
   try {
-    const res: any = await apiCapture(clampPayload(payload))
+    const res = await apiCapture(clampPayload(payload))
+    // If the server dropped our space (stale cache after a space was deleted),
+    // the artifact was stored without one — our local "saved to X" is wrong.
+    if (res && res.space_accepted === false) {
+      log.warn(`Server rejected space ${payload.space_id} (stale cache?) — saved without a space; forcing cache re-sync`)
+      syncCache().catch(() => {})
+    }
     return res?.id ?? null
   } catch (err: any) {
     if (err.name === 'ConsentRequiredError') throw err
@@ -203,6 +209,7 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     scroll_depth: msg.scrollDepth ?? 0,
     reading_depth: msg.readingDepth ?? 0,
     space_id: match.subspace.spaceId,
+    subspace_id: match.subspace.id,
     matched_marker_ids: match.matchedMarkerIds,
     tags: [],
     metadata: {},
@@ -309,6 +316,7 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
     scroll_depth: msg.scrollDepth ?? 0,
     reading_depth: msg.readingDepth ?? 0,
     space_id: match.subspace.spaceId,
+    subspace_id: match.subspace.id,
     matched_marker_ids: match.matchedMarkerIds,
     tags: [],
     metadata: {
@@ -433,6 +441,7 @@ async function retryPending(): Promise<void> {
       scroll_depth: artifact.scrollDepth,
       reading_depth: artifact.readingDepth,
       space_id: artifact.spaceId,
+      subspace_id: artifact.subspaceId,
       matched_marker_ids: artifact.matchedMarkerIds,
       tags: [],
       metadata: (artifact.metadata as Record<string, unknown>) || {},

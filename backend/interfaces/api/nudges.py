@@ -43,6 +43,33 @@ async def list_nudges(
     return rows.data or []
 
 
+@router.post("/nudges/mark-seen")
+def mark_nudges_seen(
+    space_id: Optional[int] = Query(None),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Mark active nudges as seen (the user viewed the notifications list).
+
+    Clears the unread badge. Scoped to a space when space_id is given, else all.
+    Only touches active, not-yet-seen nudges so counts stay stable.
+    """
+    from datetime import datetime, timezone
+    db = get_supabase()
+    user_id = _resolve_user_id(db, current_user.clerk_user_id)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    query = (
+        db.schema("misir").table("nudge")
+        .update({"seen_at": now_iso})
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .is_("seen_at", "null")
+    )
+    if space_id:
+        query = query.eq("space_id", space_id)
+    row = query.execute()
+    return {"updated": len(row.data or [])}
+
+
 @router.patch("/nudges/{nudge_id}")
 def patch_nudge(nudge_id: int, body: NudgePatch, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()

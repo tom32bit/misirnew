@@ -68,6 +68,7 @@ export type Artifact = {
   id: number
   user_id: string
   space_id: number | null
+  subspace_id: number | null
   url: string
   normalized_url: string
   domain: string | null
@@ -121,6 +122,8 @@ export type Nudge = {
   requires_deadline: boolean
   generated_at: string
   dismissed_at: string | null
+  /** When the user last viewed notifications; null = unseen (unread). */
+  seen_at: string | null
 }
 
 export type Deadline = {
@@ -142,6 +145,8 @@ export type Conversation = {
   archived_at: string | null
   created_at: string
   updated_at: string
+  /** When the user last opened this conversation; null = never read. */
+  last_read_at: string | null
 }
 
 export type ChatMessage = {

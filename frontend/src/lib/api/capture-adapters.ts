@@ -52,7 +52,7 @@ export type CaptureVM = {
   marker: string
   /** From artifact.space_id (null when unassigned). */
   spaceId: number | null
-  /** Backend artifact has no subspace_id today — derived via metadata, or null. */
+  /** From artifact.subspace_id (the extension's on-device match), or null. */
   subspaceId: number | null
   /** revisit_count from artifact_open_event[0].count (minus the original open). */
   revisit?: number
@@ -98,13 +98,14 @@ export function adaptCapture(
   subspaces: Subspace[] = [],
 ): CaptureVM {
   const captured = new Date(a.captured_at)
-  // Prefer metadata.subspace_id (legacy) then marker-based best-match.
+  // Prefer the real subspace_id the extension matched on-device; fall back to
+  // legacy metadata, then a marker-overlap best-match for pre-subspace_id rows.
   const metaSubspace =
     typeof (a.metadata as Record<string, unknown> | null)?.subspace_id === "number"
       ? ((a.metadata as Record<string, unknown>).subspace_id as number)
       : null
   const subspaceId =
-    metaSubspace ?? resolveSubspaceId(a.matched_marker_ids, subspaces)
+    a.subspace_id ?? metaSubspace ?? resolveSubspaceId(a.matched_marker_ids, subspaces)
   const revisitCount = a.artifact_open_event?.[0]?.count ?? 0
   const revisit = revisitCount > 1 ? revisitCount - 1 : undefined
 
@@ -177,15 +178,13 @@ export function adaptSubspaces(
   for (const st of stats ?? []) statById.set(st.id, st)
 
   return subs.map((s) => {
-    // Real attribution comes from the backend, which joins artifact markers to
-    // each subspace's markers. Captures carry no subspace_id, so we trust the
-    // backend stat when present and only fall back to a local estimate otherwise.
+    // Prefer the backend stat (it joins artifact markers to each subspace's
+    // markers). Fall back to local attribution via the artifact's real
+    // subspace_id when no stat is present.
     const stat = statById.get(s.id)
 
-    // Local fallback attribution (only used if the backend sent no stats):
-    // intersect the artifact's matched markers — which we don't have a subspace
-    // map for here — so this degrades to "no local attribution".
     const owned = artifacts.filter((a) => {
+      if (a.subspace_id != null) return a.subspace_id === s.id
       const meta = (a.metadata ?? {}) as Record<string, unknown>
       return typeof meta.subspace_id === "number" && meta.subspace_id === s.id
     })

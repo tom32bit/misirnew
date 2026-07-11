@@ -117,6 +117,10 @@ CREATE TABLE misir.artifact (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id             UUID NOT NULL REFERENCES misir.auth_user (id) ON DELETE CASCADE,
     space_id            BIGINT REFERENCES misir.space (id) ON DELETE SET NULL,
+    -- The extension matches on-device down to a specific subspace; persist it so
+    -- subspace-level views (Collection tags, per-subspace activity) are exact
+    -- rather than re-derived from marker overlap.
+    subspace_id         BIGINT REFERENCES misir.subspace (id) ON DELETE SET NULL,
 
     -- Content identity
     url                 TEXT NOT NULL,
@@ -152,6 +156,7 @@ CREATE TABLE misir.artifact (
 
 CREATE INDEX idx_artifact_user ON misir.artifact (user_id);
 CREATE INDEX idx_artifact_space ON misir.artifact (space_id);
+CREATE INDEX idx_artifact_subspace ON misir.artifact (subspace_id);
 CREATE INDEX idx_artifact_user_space ON misir.artifact (user_id, space_id);
 CREATE INDEX idx_artifact_platform ON misir.artifact (platform);
 CREATE INDEX idx_artifact_url ON misir.artifact (normalized_url);
@@ -215,6 +220,9 @@ CREATE INDEX idx_deadline_space ON misir.deadline (space_id);
 CREATE TABLE misir.gap (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     space_id            BIGINT NOT NULL REFERENCES misir.space (id) ON DELETE CASCADE,
+    -- Optional subspace scoping so a gap can point at the exact area it concerns
+    -- (KnowledgeGaps renders a subspace tag + a subspace-scoped "Investigate").
+    subspace_id         BIGINT REFERENCES misir.subspace (id) ON DELETE SET NULL,
     severity            misir.gap_severity NOT NULL DEFAULT 'Medium',
     label               TEXT NOT NULL,
     action              TEXT,
@@ -229,6 +237,7 @@ CREATE TABLE misir.gap (
 );
 
 CREATE INDEX idx_gap_space ON misir.gap (space_id);
+CREATE INDEX idx_gap_subspace ON misir.gap (subspace_id);
 CREATE INDEX idx_gap_status ON misir.gap (status);
 CREATE INDEX idx_gap_severity ON misir.gap (severity);
 
@@ -256,6 +265,8 @@ CREATE TABLE misir.nudge (
     requires_deadline   BOOLEAN NOT NULL DEFAULT false,
     generated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     dismissed_at        TIMESTAMPTZ,
+    -- When the user last viewed the notifications list. NULL = unseen (unread).
+    seen_at             TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -348,6 +359,8 @@ CREATE TABLE misir.chat_conversation (
     space_id    BIGINT REFERENCES misir.space (id) ON DELETE SET NULL,
     title       TEXT,
     archived_at TIMESTAMPTZ,
+    -- When the user last opened this conversation. Unread = updated_at is newer.
+    last_read_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

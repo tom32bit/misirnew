@@ -20,7 +20,7 @@ const VIEWS = [
     id: "notification",
     label: "Notification",
     icon: "bell",
-    countKey: "notifCritical",
+    countKey: "notifUnread",
   },
   { id: "collection", label: "Collection", icon: "library", countKey: null },
   { id: "comparison", label: "Comparison", icon: "columns-3", countKey: null },
@@ -114,8 +114,8 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
           const count =
             v.countKey === "inboxUnread"
               ? counts.inboxUnread
-              : v.countKey === "notifCritical"
-                ? counts.notifCritical
+              : v.countKey === "notifUnread"
+                ? counts.notifUnread
                 : 0
           return (
             <Link

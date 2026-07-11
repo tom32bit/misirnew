@@ -10,7 +10,7 @@ import type {
   ArtifactPayload,
   CacheResponse,
   ConsentResponse,
-  CaptureResultMessage,
+  CaptureApiResult,
 } from '@/lib/types'
 
 // Backend base URL comes from VITE_BACKEND_URL (see .env), defaulting to the
@@ -51,11 +51,11 @@ const api = ky.create({
 /**
  * Capture an artifact (web page or AI chat)
  */
-export async function apiCapture(payload: ArtifactPayload): Promise<CaptureResultMessage> {
+export async function apiCapture(payload: ArtifactPayload): Promise<CaptureApiResult> {
   try {
     const response = await api.post('artifacts/capture', {
       json: payload,
-    }).json<CaptureResultMessage>()
+    }).json<CaptureApiResult>()
     return response
   } catch (error: any) {
     if (error.response?.status === 403) {

@@ -16,4 +16,7 @@ export const inboxApi = {
     if (opts.spaceId != null) searchParams.space_id = opts.spaceId
     return k.get("inbox", { searchParams }).json<Conversation[]>()
   },
+
+  markRead: (k: KyInstance, conversationId: number) =>
+    k.post(`inbox/${conversationId}/read`).json<{ id: number; last_read_at: string }>(),
 }

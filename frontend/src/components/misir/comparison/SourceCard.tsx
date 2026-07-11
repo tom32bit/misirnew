@@ -3,8 +3,6 @@
 import { Card } from "@/components/misir/primitives/Card"
 import type { SourceVM } from "./ComparisonView"
 
-export type SourceKey = "claude" | "gemini" | "web"
-
 export function SourceCard({
   source,
   color,

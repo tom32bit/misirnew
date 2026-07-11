@@ -16,4 +16,10 @@ export const nudgesApi = {
 
   patch: (k: KyInstance, id: number, status: "dismissed" | "acted") =>
     k.patch(`nudges/${id}`, { json: { status } }).json<Nudge>(),
+
+  markSeen: (k: KyInstance, spaceId?: number) => {
+    const searchParams: Record<string, number> = {}
+    if (spaceId != null) searchParams.space_id = spaceId
+    return k.post("nudges/mark-seen", { searchParams }).json<{ updated: number }>()
+  },
 }

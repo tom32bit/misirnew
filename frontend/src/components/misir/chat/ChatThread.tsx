@@ -7,6 +7,7 @@ import Markdown from "react-markdown"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useMessages, useSendMessageStream } from "@/lib/hooks/useChat"
+import { useMarkConversationRead } from "@/lib/hooks/useInbox"
 import type { ChatMessage } from "@/lib/api/types"
 
 export function ChatThread({ conversationId }: { conversationId: number }) {
@@ -14,6 +15,16 @@ export function ChatThread({ conversationId }: { conversationId: number }) {
   const search = useSearchParams()
   const messages = useMessages(conversationId)
   const stream = useSendMessageStream(conversationId)
+  const markRead = useMarkConversationRead()
+
+  // Opening the thread (and finishing each reply) marks it read, clearing the
+  // inbox unread badge. Guarded so a mid-stream render doesn't fire early.
+  const markReadFn = markRead.mutate
+  useEffect(() => {
+    if (!stream.isStreaming) markReadFn(conversationId)
+    // markReadFn identity is stable across renders (react-query mutate).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, stream.isStreaming])
 
   const [draft, setDraft] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)

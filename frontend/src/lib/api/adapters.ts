@@ -6,12 +6,20 @@
 import type { DashboardPayload, Gap } from "./types"
 
 /**
- * Backend doesn't return an overall readiness % per space. Derive one from
- * `research_depth` (average depth_pct across topics) and penalise for open
- * critical gaps. Falls back to a baseline when the dashboard is empty.
+ * Overall readiness % (0–100) for a space. The backend computes a canonical
+ * readiness (gap coverage + research depth + source diversity) and embeds it as
+ * `synthesis.readiness` and `misirs_read.coverage` — prefer that so every
+ * surface shows the same number. Only fall back to a client-side estimate for
+ * reports cached before readiness existed, or empty/uncomputed dashboards.
  */
 export function deriveReadiness(dash: DashboardPayload | undefined): number {
   if (!dash) return 0
+
+  const canonical = dash.synthesis?.readiness ?? dash.misirs_read?.coverage
+  if (typeof canonical === "number") {
+    return Math.max(0, Math.min(100, Math.round(canonical)))
+  }
+
   const depths = dash.research_depth ?? []
   const avgDepth =
     depths.length === 0

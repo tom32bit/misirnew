@@ -24,12 +24,11 @@ import {
 } from "@/components/misir/primitives/FilterBar"
 import { SpaceTag } from "@/components/misir/primitives/Tag"
 import { useInbox } from "@/lib/hooks/useInbox"
+import { isConversationUnread } from "@/lib/hooks/useUnreadCounts"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useUIStore } from "@/lib/stores/ui-store"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import type { Conversation, Space } from "@/lib/api/types"
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 type Scope = "all" | number
 
@@ -41,15 +40,10 @@ export function InboxView({ scope }: { scope: Scope }) {
   const isAll = scope === "all"
 
   const inbox = useInbox(isAll ? {} : { spaceId: scope })
-  const list: (Conversation & { unread: boolean })[] = useMemo(() => {
-    const now = Date.now()
-    return (inbox.data ?? []).map((c) => ({
-      ...c,
-      unread:
-        Number.isFinite(Date.parse(c.updated_at)) &&
-        now - Date.parse(c.updated_at) < ONE_DAY_MS,
-    }))
-  }, [inbox.data])
+  const list: (Conversation & { unread: boolean })[] = useMemo(
+    () => (inbox.data ?? []).map((c) => ({ ...c, unread: isConversationUnread(c) })),
+    [inbox.data],
+  )
 
   const [filter, setFilter] = useState<"all" | "unread">(
     (search.get("f") as "all" | "unread") ?? "all",

@@ -20,6 +20,7 @@ class GapCreate(BaseModel):
     severity: str = "Medium"
     label: str
     action: Optional[str] = None
+    subspace_id: Optional[int] = None
 
 
 class GapUpdate(BaseModel):
@@ -48,8 +49,21 @@ def create_gap(
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id)
     _assert_space_owned(db, space_id, user_id)
+
+    # Validate the optional subspace scoping belongs to this space; drop if not.
+    subspace_id = body.subspace_id
+    if subspace_id is not None:
+        owned = (
+            db.schema("misir").table("subspace")
+            .select("id").eq("id", subspace_id).eq("space_id", space_id)
+            .execute()
+        )
+        if not owned.data:
+            subspace_id = None
+
     row = db.schema("misir").table("gap").insert({
         "space_id": space_id,
+        "subspace_id": subspace_id,
         "severity": body.severity,
         "label": body.label,
         "action": body.action,

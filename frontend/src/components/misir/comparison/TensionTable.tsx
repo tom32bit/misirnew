@@ -1,27 +1,43 @@
 "use client"
 
+import type { KeyTension } from "@/lib/api/types"
 import type { SourceVM } from "./ComparisonView"
 
 /**
- * Orange-tinted "Conflicting take" card. The prototype hardcoded a tension
- * per space; in production we synthesise it client-side from each source's
- * `signal` text (one row per source) and use the synthesis `top_insight`
- * as the edge line.
+ * Orange-tinted "Conflicting take" card. Prefers the backend's structured
+ * `key_tension` (per-source points + edge + meta) — the model's actual read of
+ * where the sources diverge. Falls back to synthesising rows from each source's
+ * `signal` for reports cached before key_tension existed.
  */
 export function TensionTable({
   sources,
-  edge,
+  tension,
   title = "Where sources diverge",
 }: {
   sources: SourceVM[]
-  edge: string | null
+  tension: KeyTension | null
   title?: string
 }) {
-  const rows = sources
-    .map((s) => ({ from: s.label, stance: s.signal }))
-    .filter((r): r is { from: string; stance: string } => !!r.stance)
+  const edge = tension?.edge ?? null
+  const meta = tension?.meta ?? null
 
-  if (rows.length === 0 && !edge) return null
+  // Backend points, if present; otherwise derive from source signals.
+  const points =
+    tension?.points && tension.points.length > 0
+      ? tension.points.map((p, i) => ({
+          num: p.num || String(i + 1).padStart(2, "0"),
+          from: p.label,
+          stance: p.text,
+        }))
+      : sources
+          .filter((s) => !!s.signal)
+          .map((s, i) => ({
+            num: String(i + 1).padStart(2, "0"),
+            from: s.label,
+            stance: s.signal as string,
+          }))
+
+  if (points.length === 0 && !edge) return null
 
   return (
     <div className="rounded-lg border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.28)] dark:bg-[rgba(217,119,87,0.08)]">
@@ -29,17 +45,15 @@ export function TensionTable({
         Conflicting take · {title}
       </div>
 
-      {rows.length > 0 && (
+      {points.length > 0 && (
         <div className="flex flex-col">
-          {rows.map((r, i) => (
+          {points.map((r, i) => (
             <div
               key={i}
               className="grid items-center gap-3.5 border-b border-border py-2 last:border-b-0"
               style={{ gridTemplateColumns: "24px 96px 1fr" }}
             >
-              <div className="font-sans text-[10px] text-fg-subtle">
-                {String(i + 1).padStart(2, "0")}
-              </div>
+              <div className="font-sans text-[10px] text-fg-subtle">{r.num}</div>
               <div className="font-serif text-[13px] font-semibold text-fg">{r.from}</div>
               <div className="font-serif text-[13px] leading-[1.5] text-fg-muted">
                 {r.stance}
@@ -53,12 +67,18 @@ export function TensionTable({
         <div
           className={[
             "mt-3.5 flex items-center gap-3 font-serif text-[13px] leading-[1.5] text-fg",
-            rows.length > 0 ? "border-t border-border pt-3.5" : "",
+            points.length > 0 ? "border-t border-border pt-3.5" : "",
             "before:font-bold before:text-accent before:content-['→']",
           ].join(" ")}
         >
           <strong className="font-semibold">Your edge.</strong>
           <span>{edge}</span>
+        </div>
+      )}
+
+      {meta && (
+        <div className="mt-2.5 font-sans text-[11.5px] leading-[1.5] text-fg-subtle">
+          {meta}
         </div>
       )}
     </div>
