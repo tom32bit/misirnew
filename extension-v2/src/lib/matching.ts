@@ -30,6 +30,14 @@ const MATCH_THRESHOLD = 0.45
 const SEMANTIC_FLOOR = 0.60
 const SPACE_MARGIN = 0.07
 
+// Semantically ADJACENT spaces (e.g. "Good Coffee" vs "Good Tea") can sit inside
+// SPACE_MARGIN even for a page that clearly belongs to one of them. Rather than
+// bail on that near-tie, break it with LEXICAL evidence: if the top space has at
+// least this many MORE distinct evidence terms than the runner-up (and higher
+// keyword coverage), trust it. A page ambiguous on BOTH signals still gets no
+// match, so precision is preserved. (See the coffee/tea cases in eval/.)
+const SPACE_LEX_TIEBREAK_MARGIN = 3
+
 // Subspace pick: subspaces of one space are all on-topic and their semantic
 // scores sit VERY close (real logs show ~6 siblings inside an 8-point band, which
 // Nomic can't separate reliably). So keyword carries real weight here (0.25) —
@@ -164,11 +172,20 @@ export function findBestMatch(
       return null
     }
     // Margin: a genuine match pulls ONE space clearly ahead. An unrelated (or
-    // genuinely ambiguous) page resembles two spaces about equally — small gap,
-    // so leave it unmatched rather than guess.
+    // genuinely ambiguous) page resembles two spaces about equally — small gap.
     if (runnerUp && winner.semSpace - runnerUp.semSpace < SPACE_MARGIN) {
-      if (debug) debug(`  no clear space — best ${(winner.semSpace * 100).toFixed(0)}% vs runner-up ${(runnerUp.semSpace * 100).toFixed(0)}% (< ${(SPACE_MARGIN * 100).toFixed(0)}pt) → no match`)
-      return null
+      // Before giving up, try to break the semantic near-tie with lexical
+      // evidence — adjacent spaces (Coffee vs Tea) confuse the embedder even when
+      // the keywords clearly point one way. Only rescue when the winner leads on
+      // BOTH evidence-term count and keyword coverage; otherwise it's genuinely
+      // ambiguous and we leave it unmatched (precision over recall).
+      const lexDecisive =
+        winner.hits >= runnerUp.hits + SPACE_LEX_TIEBREAK_MARGIN && winner.kw > runnerUp.kw
+      if (!lexDecisive) {
+        if (debug) debug(`  no clear space — best ${(winner.semSpace * 100).toFixed(0)}% vs runner-up ${(runnerUp.semSpace * 100).toFixed(0)}% (< ${(SPACE_MARGIN * 100).toFixed(0)}pt), lexical inconclusive (${winner.hits} vs ${runnerUp.hits} terms) → no match`)
+        return null
+      }
+      if (debug) debug(`  semantic near-tie (${(winner.semSpace * 100).toFixed(0)}% vs ${(runnerUp.semSpace * 100).toFixed(0)}%) broken by lexical evidence — winner has ${winner.hits} vs ${runnerUp.hits} evidence terms, kw ${(winner.kw * 100).toFixed(0)}% vs ${(runnerUp.kw * 100).toFixed(0)}%`)
     }
   } else if (winner.kw <= 0) {
     return null // keyword-only fallback: need some marker evidence

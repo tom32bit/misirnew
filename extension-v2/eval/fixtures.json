@@ -1,0 +1,113 @@
+{
+  "_comment": "Golden matching cases for the REAL corpus (eval/corpus.json). `expect` refers to corpus entries BY EXACT NAME, or null when nothing should match. `text` is the page/chat body a user would have on screen (truncated to 2000 chars). Add a case whenever you fix or report a mis-match. Run with `npm run eval`.",
+  "fixtures": [
+    {
+      "id": "coffee-espresso-machine",
+      "note": "Home espresso gear — Good Coffee › Coffee Equipment (must not drift to Good Tea's equipment).",
+      "expect": { "space": "Good Coffee", "subspace": "Coffee Equipment" },
+      "text": "Choosing your first espresso machine at home comes down to how much control you want. A manual lever pulls beautiful shots but has a steep learning curve; a semi-automatic with a decent portafilter and steam wand is the usual starting point. If you're not ready for a full espresso machine, a moka pot on the stovetop or a simple french press gets you rich coffee for a fraction of the cost. Whatever you pick, a solid tamper and a bottomless portafilter make dialing in far easier."
+    },
+    {
+      "id": "coffee-pourover",
+      "note": "Pour-over technique — Good Coffee › Brewing Methods.",
+      "expect": { "space": "Good Coffee", "subspace": "Brewing Methods" },
+      "text": "A good pour-over starts with the bloom: pour just enough hot water to saturate the grounds and let them degas for about thirty seconds. Then pour in slow concentric circles, keeping the bed level. The whole brew should finish in around three minutes. If you'd rather not stand over a kettle, cold brew is the hands-off alternative — coarse grounds steeped for twelve hours in the fridge, then filtered."
+    },
+    {
+      "id": "coffee-bean-sourcing",
+      "note": "Bean origin/roast/freshness — Good Coffee › Coffee Bean Sourcing.",
+      "expect": { "space": "Good Coffee", "subspace": "Coffee Bean Sourcing" },
+      "text": "Freshness beats everything when buying coffee. Look for a roast date on the bag, not a best-before date — beans are at their best two to four weeks after roasting. Single-origin arabica from a named farm or a direct-trade importer will tell you far more about what's in the cup than a generic blend. Learn the origin characteristics: an Ethiopian will taste floral and bright, a Sumatran earthy and heavy."
+    },
+    {
+      "id": "tea-ceylon-assam",
+      "note": "Tea leaf varieties/origins — Good Tea › Tea Varieties and Sourcing.",
+      "expect": { "space": "Good Tea", "subspace": "Tea Varieties and Sourcing" },
+      "text": "The difference between a Ceylon and an Assam is mostly in the growing altitude and oxidation. Assam, grown low and hot, gives a brisk malty cup that stands up to milk; high-grown Ceylon is lighter and more citrusy. Buying loose-leaf rather than dust in bags lets you judge quality by the wholeness of the leaf. If caffeine isn't your thing, herbal infusions like rooibos and chamomile aren't technically tea at all but brew the same way."
+    },
+    {
+      "id": "tea-steeping",
+      "note": "Steeping times / multiple infusions — Good Tea › Brewing Techniques.",
+      "expect": { "space": "Good Tea", "subspace": "Brewing Techniques" },
+      "text": "Green tea turns bitter if you oversteep it — sixty to ninety seconds is plenty for the first steep, and the leaves will happily give you a second and third infusion, each a little longer than the last. Black teas want a full three to four minutes. Leaving the leaves in the pot past that point is the most common mistake; the tannins overwhelm everything. Give the leaves room to expand and they'll open up far more flavor."
+    },
+    {
+      "id": "guava-juice",
+      "note": "Guava drink recipe — Guava › guava beverages. Discriminator vs Good Tea (mentions iced tea).",
+      "expect": { "space": "Guava", "subspace": "guava beverages" },
+      "text": "This guava juice recipe is the base for half a dozen drinks. Simmer ripe guava with a little water, push it through a sieve to remove the seeds, and sweeten to taste. From there you can stretch it into a guava iced tea, blend it into a smoothie with banana, or shake it with lime and rum for a guava mojito. It keeps in the fridge for about a week."
+    },
+    {
+      "id": "guava-dessert",
+      "note": "Sweet guava recipe — Guava › guava desserts.",
+      "expect": { "space": "Guava", "subspace": "guava desserts" },
+      "text": "Guava paste is the backbone of Latin American desserts. Cook down guava pulp with sugar until it sets into a firm, sliceable block, then layer it over cream cheese on a tart, or fold it into a buttery cake batter. A looser version becomes guava jam for spreading on toast. The high pectin in guava means it thickens quickly, so watch the pot toward the end."
+    },
+    {
+      "id": "guava-varieties",
+      "note": "Guava species/types — Guava › common guava varieties.",
+      "expect": { "space": "Guava", "subspace": "common guava varieties" },
+      "text": "The guava you'll find in most markets is Psidium guajava, the common or apple guava. White guava has pale flesh and a milder, sweeter taste, while pink varieties are more aromatic. As a tropical fruit it bruises easily, so it's often sold slightly underripe. The pulp is dense with small hard seeds near the center."
+    },
+    {
+      "id": "kryptonite-biology",
+      "note": "Superman powers/weaknesses — Superman › Superman's Kryptonian biology. Note this subspace has noisy learned markers (green, fall, first...).",
+      "expect": { "space": "Superman", "subspace": "Superman's Kryptonian biology" },
+      "text": "Superman's powers come from his Kryptonian physiology reacting to a yellow sun — his cells store solar energy that fuels flight, heat vision and near invulnerability. Green kryptonite, radioactive fragments of his home planet, disrupts that process and weakens him within minutes of exposure. His heat vision and x-ray vision both have limits, and the Fortress of Solitude houses Kryptonian technology tied to his heritage."
+    },
+    {
+      "id": "batman-gadgets",
+      "note": "Batman tech — Superman › Batman's Gotham tech arsenal (must beat the Kryptonian-biology subspace despite shared 'Superman' space).",
+      "expect": { "space": "Superman", "subspace": "Batman's Gotham tech arsenal" },
+      "text": "Batman has no powers, so his edge is engineering. The utility belt carries batarang variants for every situation, the Batmobile is armored and computer-linked to the Batcave, and his working relationship with Commissioner Gordon gives him surveillance reach across Gotham. Much of his gear is about incapacitating opponents without lethal force — grapple guns, smoke pellets, and a lie detector built into the cowl."
+    },
+    {
+      "id": "dc-multiverse",
+      "note": "Crossover/alternate-earths event — Superman › DC Multiverse crossovers.",
+      "expect": { "space": "Superman", "subspace": "DC Multiverse crossovers" },
+      "text": "Crisis on Infinite Earths collapsed DC's parallel earths into one continuity, and every reboot since has reshuffled the multiverse. Flashpoint rewrote the timeline again, spinning off alternate versions of Superman and Batman across parallel worlds. These crossover events let an Earth-2 Lex Luthor stand beside the mainline heroes, and threads like Doomsday Clock tie the whole shared universe together."
+    },
+    {
+      "id": "mbbs-curriculum",
+      "note": "Short prompt, recall from subspace name/description — Medical Education App › Core Curriculum Management.",
+      "expect": { "space": "Medical Education App", "subspace": "Core Curriculum Management" },
+      "text": "I'm building the curriculum module for an MBBS app. It needs an MBBS syllabus tracker mapped year by year, a clinical rotation schedule, and an academic milestone calendar, plus a repository for prescribed medical textbooks and a lecture video archive students can revisit before exams."
+    },
+    {
+      "id": "usmle-exam-prep",
+      "note": "Medical licensing exam prep — Medical Education App › Exam Preparation Hub.",
+      "expect": { "space": "Medical Education App", "subspace": "Exam Preparation Hub" },
+      "text": "For the exam-prep section we want a question bank covering USMLE Step 1, PLAB and NEET PG, with flashcards generated from a student's weak areas. An exam pattern analyzer would show which topics recur, and a weakness heat map over past practice papers would tell each student where to focus their revision."
+    },
+    {
+      "id": "f1-karting-career",
+      "note": "Getting into F1 as a driver — Formula One › Driver Career Pathways.",
+      "expect": { "space": "Formula One", "subspace": "Driver Career Pathways" },
+      "text": "The road to Formula 1 almost always starts in karting as a child. From there drivers climb the single-seater ladder — Formula 4, then F3 and F2 — collecting the superlicense points the FIA requires before you can race in F1. A place in a manufacturer's young driver program, or a test and reserve contract with a team, is often the bridge between the junior series and a race seat."
+    },
+    {
+      "id": "cat-litter-training",
+      "note": "Litter/behaviour — Good Cat › Behavioral Training and Socialization.",
+      "expect": { "space": "Good Cat", "subspace": "Behavioral Training and Socialization" },
+      "text": "Most litter box problems are behavioral, not medical, once you rule out illness. Keep one box per cat plus one extra, scoop daily, and place them away from noisy appliances. When introducing a new cat, go slow to avoid aggression in a multi-cat home — swap scents first, then supervise short meetings. Reward calm behavior; punishment just makes a cat more anxious. A tall scratching post near their favorite nap spot saves your furniture."
+    },
+    {
+      "id": "cat-nutrition",
+      "note": "Cat diet/feeding — Good Cat › Nutrition and Feeding Schedules.",
+      "expect": { "space": "Good Cat", "subspace": "Nutrition and Feeding Schedules" },
+      "text": "Look for a cat food that meets AAFCO standards for your cat's life stage — kittens need far more protein and calories than a senior cat whose metabolism has slowed. Measure portions rather than free-feeding to avoid weight gain, and don't fall for grain-free marketing myths; grains aren't the problem for most cats. Keep an eye on recall notices for whatever brand you buy."
+    },
+    {
+      "id": "neg-javascript-async",
+      "note": "True negative — a programming page matching none of the seven spaces.",
+      "expect": null,
+      "text": "Understanding async/await in JavaScript starts with the event loop. A Promise represents a value that isn't ready yet; awaiting it suspends the surrounding async function without blocking the main thread. Under the hood the runtime schedules the continuation as a microtask, which resolves before a setTimeout callback even when both are ready."
+    },
+    {
+      "id": "neg-mortgage-rates",
+      "note": "True negative — personal finance, unrelated to every space.",
+      "expect": null,
+      "text": "Fixed versus variable mortgage rates come down to your appetite for risk. A fixed rate locks your monthly payment for the term, which is comforting when interest rates are climbing. A variable rate usually starts lower but moves with the central bank, so your repayment can rise. Refinancing can help if rates drop, but watch for early-repayment penalties."
+    }
+  ]
+}

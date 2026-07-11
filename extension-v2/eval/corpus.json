@@ -1,0 +1,570 @@
+{
+  "_comment": "REAL library exported from Supabase (misir.space/subspace/marker). This is the ground-truth corpus the matching eval scores against. Regenerate with the export query in eval/README.md. Markers are {label, weight}.",
+  "spaces": [
+        {
+            "id": 23,
+            "goal": "How to make good coffee at home",
+            "name": "Good Coffee",
+            "subspaces": [
+                {
+                    "id": 103,
+                    "name": "Coffee Equipment",
+                    "markers": [
+                        { "label": "espresso machines", "weight": 1 },
+                        { "label": "french press", "weight": 1 },
+                        { "label": "moka pot", "weight": 0.9 },
+                        { "label": "manual drip", "weight": 0.8 },
+                        { "label": "automatic brewer", "weight": 0.7 }
+                    ],
+                    "description": "Types and selection of home coffee machines and tools for optimal brewing"
+                },
+                {
+                    "id": 104,
+                    "name": "Coffee Bean Sourcing",
+                    "markers": [
+                        { "label": "arabica beans", "weight": 1 },
+                        { "label": "single-origin", "weight": 1 },
+                        { "label": "roast date", "weight": 0.9 },
+                        { "label": "direct trade", "weight": 0.8 },
+                        { "label": "bean origin", "weight": 0.7 }
+                    ],
+                    "description": "Understanding bean origins, roasts, and freshness for home brewing"
+                },
+                {
+                    "id": 105,
+                    "name": "Grinding Techniques",
+                    "markers": [
+                        { "label": "burr grinder", "weight": 1 },
+                        { "label": "grind size", "weight": 1 },
+                        { "label": "consistency", "weight": 0.9 },
+                        { "label": "dose weight", "weight": 0.8 },
+                        { "label": "grind setting", "weight": 0.7 }
+                    ],
+                    "description": "Optimal grind settings and consistency for different brewing methods"
+                },
+                {
+                    "id": 106,
+                    "name": "Brewing Methods",
+                    "markers": [
+                        { "label": "cold brew", "weight": 1 },
+                        { "label": "pour-over", "weight": 1 },
+                        { "label": "steeping time", "weight": 0.9 },
+                        { "label": "bloom phase", "weight": 0.8 },
+                        { "label": "pressure brewing", "weight": 0.7 }
+                    ],
+                    "description": "Step-by-step execution of pour-over, cold brew, and other home techniques"
+                },
+                {
+                    "id": 107,
+                    "name": "Water Quality & Ratios",
+                    "markers": [
+                        { "label": "coffee-to-water ratio", "weight": 1 },
+                        { "label": "water mineral content", "weight": 1 },
+                        { "label": "filtered water", "weight": 0.9 },
+                        { "label": "hardness level", "weight": 0.8 },
+                        { "label": "temperature control", "weight": 0.7 }
+                    ],
+                    "description": "Impact of water composition and coffee-to-water measurements"
+                }
+            ],
+            "description": "How to make good coffee at home"
+        },
+        {
+            "id": 24,
+            "goal": "I want to learn about different types of guava and recipe",
+            "name": "Guava",
+            "subspaces": [
+                {
+                    "id": 108,
+                    "name": "common guava varieties",
+                    "markers": [
+                        { "label": "common guava", "weight": 1 },
+                        { "label": "psidium guajava", "weight": 1 },
+                        { "label": "white guava", "weight": 0.9 },
+                        { "label": "guava pulp", "weight": 0.8 },
+                        { "label": "tropical fruit", "weight": 0.7 }
+                    ],
+                    "description": "dominant commercial guava types including psidium guajava and white guava"
+                },
+                {
+                    "id": 109,
+                    "name": "tropical guava strains",
+                    "markers": [
+                        { "label": "strawberry guava", "weight": 1 },
+                        { "label": "mexican guava", "weight": 0.9 },
+                        { "label": "apple guava", "weight": 0.8 },
+                        { "label": "wild guava", "weight": 0.7 },
+                        { "label": "purple guava", "weight": 0.6 }
+                    ],
+                    "description": "lesser-known guava species like strawberry and mexican guava"
+                },
+                {
+                    "id": 110,
+                    "name": "guava beverages",
+                    "markers": [
+                        { "label": "guava juice", "weight": 1 },
+                        { "label": "guava iced tea", "weight": 0.9 },
+                        { "label": "guava mojito", "weight": 0.8 },
+                        { "label": "guava smoothie", "weight": 0.8 },
+                        { "label": "guava soda", "weight": 0.7 }
+                    ],
+                    "description": "drink recipes featuring guava juice, iced tea, and cocktails"
+                },
+                {
+                    "id": 111,
+                    "name": "guava desserts",
+                    "markers": [
+                        { "label": "guava paste", "weight": 1 },
+                        { "label": "guava tart", "weight": 0.9 },
+                        { "label": "guava jam", "weight": 0.8 },
+                        { "label": "guava cake", "weight": 0.7 },
+                        { "label": "guava dulce", "weight": 0.6 }
+                    ],
+                    "description": "sweet recipes using guava paste, tarts, and jams"
+                },
+                {
+                    "id": 112,
+                    "name": "savory guava dishes",
+                    "markers": [
+                        { "label": "guava salsa", "weight": 1 },
+                        { "label": "guava chutney", "weight": 0.9 },
+                        { "label": "grilled guava", "weight": 0.8 },
+                        { "label": "guava glaze", "weight": 0.7 },
+                        { "label": "guava steak", "weight": 0.6 }
+                    ],
+                    "description": "main course applications like salsas, chutneys, and grilled recipes"
+                },
+                {
+                    "id": 113,
+                    "name": "cultural guava dishes",
+                    "markers": [
+                        { "label": "guava empanada", "weight": 1 },
+                        { "label": "guava curry", "weight": 0.9 },
+                        { "label": "guava dosa", "weight": 0.8 },
+                        { "label": "guava fritters", "weight": 0.7 },
+                        { "label": "guava tamales", "weight": 0.6 }
+                    ],
+                    "description": "regional recipes from latin america, india, and southeast asia"
+                },
+                {
+                    "id": 114,
+                    "name": "guava preservation",
+                    "markers": [
+                        { "label": "guava jelly", "weight": 1 }
+                    ],
+                    "description": "techniques for making jellies, dried guava, and long-term storage"
+                }
+            ],
+            "description": "I want to learn about different types of guava and recipe"
+        },
+        {
+            "id": 25,
+            "goal": "I want to learn how to make good tea at home",
+            "name": "Good Tea",
+            "subspaces": [
+                {
+                    "id": 115,
+                    "name": "Tea Varieties and Sourcing",
+                    "markers": [
+                        { "label": "loose leaf quality", "weight": 1 },
+                        { "label": "ceylon vs assam", "weight": 0.9 },
+                        { "label": "oxidation levels", "weight": 0.8 },
+                        { "label": "single estate origin", "weight": 0.8 },
+                        { "label": "herbal infusions", "weight": 0.7 }
+                    ],
+                    "description": "Exploration of loose-leaf quality, oxidation levels, and regional origins like Ceylon vs Assam"
+                },
+                {
+                    "id": 116,
+                    "name": "Water Quality Parameters",
+                    "markers": [
+                        { "label": "boiling temperature", "weight": 1 },
+                        { "label": "pH balance", "weight": 0.9 },
+                        { "label": "filtered vs distilled", "weight": 0.8 },
+                        { "label": "water-to-tea ratios", "weight": 0.8 },
+                        { "label": "limescale impact", "weight": 0.7 }
+                    ],
+                    "description": "Mineral content, pH balance, and temperature control for optimal extraction"
+                },
+                {
+                    "id": 117,
+                    "name": "Brewing Equipment",
+                    "markers": [
+                        { "label": "temperature-controlled kettles", "weight": 1 },
+                        { "label": "ceramic vs glass teapots", "weight": 0.9 },
+                        { "label": "gaiwan tamping", "weight": 0.8 },
+                        { "label": "tea press pressure", "weight": 0.8 },
+                        { "label": "mesh infuser size", "weight": 0.7 }
+                    ],
+                    "description": "Kettles, teapots, and infusers with material-specific performance characteristics"
+                },
+                {
+                    "id": 118,
+                    "name": "Brewing Techniques",
+                    "markers": [
+                        { "label": "first steep timing", "weight": 1 },
+                        { "label": "second steep strength", "weight": 0.9 },
+                        { "label": "cold brew ratios", "weight": 0.8 },
+                        { "label": "oversteep bitterness", "weight": 0.8 },
+                        { "label": "leaf expansion space", "weight": 0.7 }
+                    ],
+                    "description": "Steeping times, multiple infusions, and cold brewing methods"
+                },
+                {
+                    "id": 119,
+                    "name": "Storage and Freshness",
+                    "markers": [
+                        { "label": "airtight containers", "weight": 1 },
+                        { "label": "moisture exposure", "weight": 0.9 },
+                        { "label": "shelf life indicators", "weight": 0.8 },
+                        { "label": "tamping down aromatics", "weight": 0.8 },
+                        { "label": "oxidation prevention", "weight": 0.7 }
+                    ],
+                    "description": "Airtight containment, moisture control, and tamping techniques"
+                }
+            ],
+            "description": "I want to learn how to make good tea at home"
+        },
+        {
+            "id": 26,
+            "goal": "How to get into formula one",
+            "name": "Formula One",
+            "subspaces": [
+                {
+                    "id": 120,
+                    "name": "Driver Career Pathways",
+                    "markers": [
+                        { "label": "karting career progression", "weight": 1 },
+                        { "label": "young driver programs", "weight": 1 },
+                        { "label": "F3 championship results", "weight": 0.9 },
+                        { "label": "FIA super license requirements", "weight": 0.8 },
+                        { "label": "test driver contracts", "weight": 0.7 }
+                    ],
+                    "description": "Progression from karting to F1, including junior series and team academies"
+                },
+                {
+                    "id": 121,
+                    "name": "Engineering Roles Breakdown",
+                    "markers": [
+                        { "label": "aerodynamics simulation tools", "weight": 1 },
+                        { "label": "power unit development teams", "weight": 0.9 },
+                        { "label": "data acquisition systems", "weight": 0.8 },
+                        { "label": "composite materials testing", "weight": 0.7 },
+                        { "label": "wind tunnel optimization", "weight": 0.6 }
+                    ],
+                    "description": "Specialized technical positions in F1 teams and their skill requirements"
+                },
+                {
+                    "id": 122,
+                    "name": "Business & Sponsorship",
+                    "markers": [
+                        { "label": "team sponsorship deals", "weight": 1 },
+                        { "label": "constructor championship revenue", "weight": 0.9 },
+                        { "label": "F1 team ownership structures", "weight": 0.8 },
+                        { "label": "brand activation strategies", "weight": 0.7 },
+                        { "label": "merchandising rights management", "weight": 0.6 }
+                    ],
+                    "description": "Corporate structures, funding models, and commercial opportunities in F1"
+                },
+                {
+                    "id": 123,
+                    "name": "Media & Broadcasting",
+                    "markers": [
+                        { "label": "F1 broadcast contracts", "weight": 1 },
+                        { "label": "race commentary training", "weight": 0.9 },
+                        { "label": "digital content partnerships", "weight": 0.8 },
+                        { "label": "social media analytics", "weight": 0.7 },
+                        { "label": "highlight reel production", "weight": 0.6 }
+                    ],
+                    "description": "Content creation, commentary roles, and digital engagement in F1"
+                },
+                {
+                    "id": 124,
+                    "name": "Support Staff Roles",
+                    "markers": [
+                        { "label": "race strategy coordination", "weight": 1 },
+                        { "label": "pit crew training protocols", "weight": 0.9 },
+                        { "label": "travel logistics management", "weight": 0.8 },
+                        { "label": "medical team certifications", "weight": 0.7 },
+                        { "label": "fan engagement programs", "weight": 0.6 }
+                    ],
+                    "description": "Non-driver, non-engineer positions critical to race operations"
+                },
+                {
+                    "id": 125,
+                    "name": "Regulatory Compliance",
+                    "markers": [
+                        { "label": "FIA safety regulations compliance", "weight": 1 },
+                        { "label": "technical homologation processes", "weight": 0.9 },
+                        { "label": "safety car protocols", "weight": 0.8 },
+                        { "label": "fuel flow meter calibration", "weight": 0.7 },
+                        { "label": "tyre pressure monitoring", "weight": 0.6 }
+                    ],
+                    "description": "FIA regulations, safety standards, and technical homologation processes"
+                }
+            ],
+            "description": "How to get into formula one"
+        },
+        {
+            "id": 27,
+            "goal": "I want to take care of my cats better",
+            "name": "Good Cat",
+            "subspaces": [
+                {
+                    "id": 126,
+                    "name": "Nutrition and Feeding Schedules",
+                    "markers": [
+                        { "label": "AAFCO standards", "weight": 1 },
+                        { "label": "kitten diet requirements", "weight": 1 },
+                        { "label": "senior cat metabolism", "weight": 0.9 },
+                        { "label": "cat food recalls", "weight": 0.8 },
+                        { "label": "portion control tools", "weight": 0.8 },
+                        { "label": "grain-free myths", "weight": 0.7 }
+                    ],
+                    "description": "Cat food types, portion control, dietary restrictions, and feeding routine optimization"
+                },
+                {
+                    "id": 127,
+                    "name": "Behavioral Training and Socialization",
+                    "markers": [
+                        { "label": "litter box training", "weight": 1 },
+                        { "label": "aggression in multi-cat", "weight": 0.9 },
+                        { "label": "positive reinforcement", "weight": 0.8 },
+                        { "label": "scratching post setup", "weight": 0.8 },
+                        { "label": "cat body language", "weight": 0.7 },
+                        { "label": "cat introductions", "weight": 0.7 }
+                    ],
+                    "description": "Litter box protocols, scratching post training, and multi-cat household dynamics"
+                },
+                {
+                    "id": 128,
+                    "name": "Health Monitoring and Prevention",
+                    "markers": [
+                        { "label": "feline diabetes symptoms", "weight": 1 },
+                        { "label": "vaccination schedules", "weight": 0.9 },
+                        { "label": "parasite prevention", "weight": 0.8 },
+                        { "label": "urinary tract signs", "weight": 0.8 },
+                        { "label": "cat first aid", "weight": 0.7 },
+                        { "label": "dental care tools", "weight": 0.7 }
+                    ],
+                    "description": "Symptom recognition, vet visit protocols, and common feline health risks"
+                },
+                {
+                    "id": 129,
+                    "name": "Grooming and Hygiene Practices",
+                    "markers": [
+                        { "label": "shedding season tips", "weight": 1 },
+                        { "label": "claw trimming tools", "weight": 0.9 },
+                        { "label": "cat bath alternatives", "weight": 0.8 },
+                        { "label": "ear cleaning tools", "weight": 0.8 },
+                        { "label": "fur mat prevention", "weight": 0.7 },
+                        { "label": "anal gland issues", "weight": 0.6 }
+                    ],
+                    "description": "Brushing techniques, bathing protocols, and seasonal shedding management"
+                },
+                {
+                    "id": 130,
+                    "name": "Environmental Enrichment Design",
+                    "markers": [
+                        { "label": "cat tree placement", "weight": 1 },
+                        { "label": "window perch design", "weight": 0.9 },
+                        { "label": "sensory stimulation", "weight": 0.8 },
+                        { "label": "toxic plants for cats", "weight": 0.8 },
+                        { "label": "cat-safe outdoor enclosures", "weight": 0.7 },
+                        { "label": "emergency escape proofing", "weight": 0.6 }
+                    ],
+                    "description": "Vertical space optimization, safe outdoor access, and sensory stimulation solutions"
+                }
+            ],
+            "description": "I want to take care of my cats better"
+        },
+        {
+            "id": 28,
+            "goal": "I want make a all in one medical education app that works like ERP system for MBBS student.",
+            "name": "Medical Education App",
+            "subspaces": [
+                {
+                    "id": 131,
+                    "name": "Core Curriculum Management",
+                    "markers": [
+                        { "label": "mbbs syllabus tracker", "weight": 1 },
+                        { "label": "clinical rotation schedule", "weight": 0.9 },
+                        { "label": "academic milestone calendar", "weight": 0.8 },
+                        { "label": "medical textbook repository", "weight": 0.7 },
+                        { "label": "lecture video archive", "weight": 0.6 }
+                    ],
+                    "description": "Centralized tracking of MBBS syllabi, lecture schedules, and academic milestones with integrated resource libraries."
+                },
+                {
+                    "id": 132,
+                    "name": "Exam Preparation Hub",
+                    "markers": [
+                        { "label": "usmle flashcard generator", "weight": 1 },
+                        { "label": "plab practice questions", "weight": 0.9 },
+                        { "label": "neet pg question bank", "weight": 0.8 },
+                        { "label": "exam pattern analyzer", "weight": 0.7 },
+                        { "label": "weakness heat map", "weight": 0.6 }
+                    ],
+                    "description": "Customizable question banks, past paper analysis tools, and performance dashboards for medical licensing exams."
+                },
+                {
+                    "id": 133,
+                    "name": "Clinical Skills Training",
+                    "markers": [
+                        { "label": "virtual patient simulator", "weight": 1 },
+                        { "label": "osce checklists", "weight": 0.9 },
+                        { "label": "procedural video guides", "weight": 0.8 },
+                        { "label": "skill competency matrix", "weight": 0.7 },
+                        { "label": "clinical case discussion", "weight": 0.6 }
+                    ],
+                    "description": "Virtual patient simulations, OSCE preparation modules, and procedural competency tracking for hands-on training."
+                },
+                {
+                    "id": 134,
+                    "name": "Research & Publications",
+                    "markers": [
+                        { "label": "medical research database", "weight": 1 },
+                        { "label": "peer review tracker", "weight": 0.9 },
+                        { "label": "grant application template", "weight": 0.8 },
+                        { "label": "journal submission portal", "weight": 0.7 },
+                        { "label": "data analysis toolkit", "weight": 0.6 }
+                    ],
+                    "description": "Medical literature database, research project management tools, and publication submission tracking system."
+                },
+                {
+                    "id": 135,
+                    "name": "Administrative Workflow",
+                    "markers": [
+                        { "label": "tuition fee payment portal", "weight": 1 },
+                        { "label": "leave application form", "weight": 0.9 },
+                        { "label": "document verification queue", "weight": 0.8 },
+                        { "label": "attendance reconciliation", "weight": 0.7 },
+                        { "label": "institutional announcement board", "weight": 0.6 }
+                    ],
+                    "description": "Integrated fee management, leave applications, and institutional communication tools for administrative efficiency."
+                },
+                {
+                    "id": 136,
+                    "name": "Collaborative Learning",
+                    "markers": [
+                        { "label": "group study whiteboard", "weight": 1 },
+                        { "label": "clinical case discussion forum", "weight": 0.9 },
+                        { "label": "peer review system", "weight": 0.8 },
+                        { "label": "study group scheduler", "weight": 0.7 },
+                        { "label": "knowledge exchange repository", "weight": 0.6 }
+                    ],
+                    "description": "Group study tools, case discussion forums, and peer-to-peer knowledge sharing platforms for medical students."
+                },
+                {
+                    "id": 137,
+                    "name": "Career Planning & Placement",
+                    "markers": [
+                        { "label": "residency application tracker", "weight": 1 },
+                        { "label": "hospital placement portal", "weight": 0.9 },
+                        { "label": "cv builder medical", "weight": 0.8 },
+                        { "label": "job vacancy alert", "weight": 0.7 },
+                        { "label": "career mentor matching", "weight": 0.6 }
+                    ],
+                    "description": "Residency application tracking, hospital placement coordination, and professional development resources."
+                }
+            ],
+            "description": "I want make a all in one medical education app that works like ERP system for MBBS student."
+        },
+        {
+            "id": 29,
+            "goal": "I want to learn about superman and DC world, especially superman vs batman",
+            "name": "Superman",
+            "subspaces": [
+                {
+                    "id": 138,
+                    "name": "Superman's Kryptonian biology",
+                    "markers": [
+                        { "label": "kryptonian dna structure", "weight": 1 },
+                        { "label": "kryptonite exposure", "weight": 1 },
+                        { "label": "heat vision mechanics", "weight": 0.9 },
+                        { "label": "fortress of solitude", "weight": 0.8 },
+                        { "label": "x-ray vision limits", "weight": 0.7 },
+                        { "label": "decades", "weight": 0.6 },
+                        { "label": "december 1949", "weight": 0.6 },
+                        { "label": "december 1950", "weight": 0.6 },
+                        { "label": "fall", "weight": 0.6 },
+                        { "label": "first", "weight": 0.6 },
+                        { "label": "green", "weight": 0.6 },
+                        { "label": "kryptonite", "weight": 0.6 },
+                        { "label": "late 1950s", "weight": 0.6 },
+                        { "label": "minutes", "weight": 0.6 },
+                        { "label": "november", "weight": 0.6 },
+                        { "label": "phasing through walls", "weight": 0.6 },
+                        { "label": "superman", "weight": 0.6 },
+                        { "label": "third", "weight": 0.6 },
+                        { "label": "this may", "weight": 0.6 },
+                        { "label": "tomorrow", "weight": 0.6 },
+                        { "label": "until 1949", "weight": 0.6 }
+                    ],
+                    "description": "Genetic traits, powers, and weaknesses tied to Superman's alien heritage and Earth-based evolution"
+                },
+                {
+                    "id": 139,
+                    "name": "Batman's Gotham tech arsenal",
+                    "markers": [
+                        { "label": "batarang variants", "weight": 1 },
+                        { "label": "batmobile specs", "weight": 0.9 },
+                        { "label": "arkham protocols", "weight": 0.8 },
+                        { "label": "gordon's surveillance", "weight": 0.7 },
+                        { "label": "lie detector tech", "weight": 0.6 },
+                        { "label": "gcpd database", "weight": 0.5 }
+                    ],
+                    "description": "Advanced gadgets, vehicles, and tactical systems defining Batman's crime-fighting methods"
+                },
+                {
+                    "id": 140,
+                    "name": "Superman vs Batman combat dynamics",
+                    "markers": [
+                        { "label": "truth vs justice clash", "weight": 1 },
+                        { "label": "no killing rule", "weight": 0.9 },
+                        { "label": "arkham asylum showdown", "weight": 0.8 },
+                        { "label": "kriptonite armor", "weight": 0.7 },
+                        { "label": "grapple gun limits", "weight": 0.6 },
+                        { "label": "precrime simulations", "weight": 0.5 }
+                    ],
+                    "description": "Theoretical battle scenarios analyzing power scaling, strategy, and narrative outcomes"
+                },
+                {
+                    "id": 141,
+                    "name": "DC Multiverse crossovers",
+                    "markers": [
+                        { "label": "infinite earths reboot", "weight": 1 },
+                        { "label": "earth-2 lex luthor", "weight": 0.9 },
+                        { "label": "flashpoint timeline", "weight": 0.8 },
+                        { "label": "crossover events", "weight": 0.7 },
+                        { "label": "parallel earths", "weight": 0.6 },
+                        { "label": "doomsday clock", "weight": 0.5 }
+                    ],
+                    "description": "Shared universe events and alternate reality versions impacting Superman/Batman narratives"
+                },
+                {
+                    "id": 142,
+                    "name": "Lois Lane and Alfred Pennyworth roles",
+                    "markers": [
+                        { "label": "lois lane relationship", "weight": 1 },
+                        { "label": "alfred's role", "weight": 0.9 },
+                        { "label": "daily planet", "weight": 0.8 },
+                        { "label": "batcave tech", "weight": 0.7 },
+                        { "label": "truth verification", "weight": 0.6 },
+                        { "label": "moral guidance", "weight": 0.5 }
+                    ],
+                    "description": "Supporting characters influencing Superman and Batman's decision-making processes"
+                },
+                {
+                    "id": 143,
+                    "name": "Media adaptations analysis",
+                    "markers": [
+                        { "label": "man of steel 2013", "weight": 1 }
+                    ],
+                    "description": "Film, TV, and comic interpretations of Superman/Batman conflicts"
+                }
+            ],
+            "description": "I want to learn about superman and DC world, especially superman vs batman"
+        }
+    ]
+}

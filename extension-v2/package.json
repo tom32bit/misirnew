@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "vitest run --config vitest.eval.config.ts",
     "lint": "eslint . --ext ts,tsx",
     "postinstall": "npm run copy:ort"
   },
