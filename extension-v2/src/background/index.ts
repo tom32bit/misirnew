@@ -185,7 +185,7 @@ async function clearConsentNotice(): Promise<void> {
 async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMessage> {
   const subspacesWithMarkers = await getSubspacesWithMarkers()
   if (subspacesWithMarkers.length === 0) {
-    log.debug('No subspaces in cache — skipping match for', msg.url)
+    dbg('Save skipped: no spaces cached yet — open the app to sync, then retry')
     return { matched: false }
   }
 
@@ -198,8 +198,8 @@ async function handleCapture(msg: CapturePageMessage): Promise<CaptureResultMess
     .first()
 
   if (recent) {
-    log.debug('Duplicate skipped:', msg.url)
-    return { matched: false }
+    dbg(`Already captured this page in the last 24h — not saved again (${msg.url})`)
+    return { matched: false, duplicate: true }
   }
 
   const match = await computeMatch(msg.textContent, subspacesWithMarkers)
@@ -295,7 +295,10 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
   const { capture, normalizedUrl, domain, contentHash, wordCount } = msg
 
   const subspacesWithMarkers = await getSubspacesWithMarkers()
-  if (subspacesWithMarkers.length === 0) return { matched: false }
+  if (subspacesWithMarkers.length === 0) {
+    dbg('Save skipped: no spaces cached yet — open the app to sync, then retry')
+    return { matched: false }
+  }
 
   // Dedup by content hash
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -304,8 +307,8 @@ async function handleAIChat(msg: CaptureAIChatMessage): Promise<CaptureResultMes
     .first()
 
   if (recent) {
-    log.debug(`AI chat duplicate skipped: "${capture.title}"`)
-    return { matched: false }
+    dbg(`Already captured this conversation in the last 24h — not saved again ("${capture.title}")`)
+    return { matched: false, duplicate: true }
   }
 
   const text = chatCaptureToText(capture)
@@ -1090,7 +1093,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'SIGN_OUT') {
     embedCache = null
-    Promise.all([clearLocalData(), chrome.storage.local.remove('misirEmbeds')])
+    Promise.all([clearLocalData(), chrome.storage.local.remove(['misirEmbeds', 'misirSaved'])])
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }))
     return true

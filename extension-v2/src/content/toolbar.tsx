@@ -11,7 +11,7 @@ import { WarningModal } from './warning-modal'
 
 // Result of a save attempt, surfaced in the pill after the background responds.
 export interface SaveOutcome {
-  status: 'saved' | 'nomatch'
+  status: 'saved' | 'nomatch' | 'duplicate'
   spaceName?: string
   subspaceName?: string
   /** 0–1 relevance score from the matcher. */
@@ -177,13 +177,14 @@ function ToolbarComponent({ onSaveClick, onCorrect, isVisible, isSaving, outcome
 
   const saved = outcome?.status === 'saved'
   const nomatch = outcome?.status === 'nomatch'
+  const duplicate = outcome?.status === 'duplicate'
   // The match info shown in the card: the confirmed result after a save, else
   // the live preview while idle.
   const info = saved ? outcome : !outcome && !isSaving ? preview : null
   const hasMatch = info?.confidence != null
   const pct = hasMatch ? Math.round(info!.confidence! * 100) : null
   // Computing the initial match (before any result exists yet).
-  const isChecking = !!checking && !hasMatch && !saved && !nomatch && !isSaving
+  const isChecking = !!checking && !hasMatch && !saved && !nomatch && !duplicate && !isSaving
 
   // Always the Claude clay accent — the card lives on the dark brand, so the
   // primary action should read as clay, not the host platform's colour.
@@ -194,14 +195,16 @@ function ToolbarComponent({ onSaveClick, onCorrect, isVisible, isSaving, outcome
     ? 'Saving'
     : saved
       ? 'Saved'
-      : nomatch
-        ? 'No match'
-        : hasMatch
-          ? 'Best match'
-          : isChecking
-            ? 'Checking'
-            : 'Misir'
-  const headIcon = spinning ? <Loader2 /> : saved ? <Check /> : nomatch ? <SearchX /> : <Sparkles />
+      : duplicate
+        ? 'Already saved'
+        : nomatch
+          ? 'No match'
+          : hasMatch
+            ? 'Best match'
+            : isChecking
+              ? 'Checking'
+              : 'Misir'
+  const headIcon = spinning ? <Loader2 /> : saved || duplicate ? <Check /> : nomatch ? <SearchX /> : <Sparkles />
 
   return (
     <div
@@ -229,11 +232,13 @@ function ToolbarComponent({ onSaveClick, onCorrect, isVisible, isSaving, outcome
           </>
         ) : (
           <div className="misir-card__empty">
-            {nomatch
-              ? 'No space matched this page, so nothing was saved.'
-              : isChecking
-                ? 'Checking this page against your spaces…'
-                : 'We’ll match this to your spaces.'}
+            {duplicate
+              ? 'You already saved this recently — nothing new to add.'
+              : nomatch
+                ? 'No space matched this page, so nothing was saved.'
+                : isChecking
+                  ? 'Checking this page against your spaces…'
+                  : 'We’ll match this to your spaces.'}
           </div>
         )}
 

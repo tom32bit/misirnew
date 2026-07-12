@@ -103,7 +103,8 @@ async function checkPlatform(): Promise<void> {
   // Genuine navigation (new page or conversation) → forget the previous page's
   // saved state so the card starts fresh rather than showing "Saved" / offering
   // to continue a chat that's no longer on screen.
-  if (window.location.href !== lastActiveHref) {
+  const navigated = window.location.href !== lastActiveHref
+  if (navigated) {
     lastActiveHref = window.location.href
     savedTextLength = null
     lastSavedOutcome = null
@@ -126,6 +127,11 @@ async function checkPlatform(): Promise<void> {
   }
 
   if (mode) {
+    // Rehydrate any prior save for this URL (survives reloads/SW restarts) BEFORE
+    // the first preview, so a chat that grew while we were away is detected as a
+    // continuation rather than a fresh page. Runs after initToolbar so the
+    // restored "Saved" state can render.
+    if (navigated) await restoreSaved()
     // A new URL usually means new content — force the next preview. Web pages
     // are ready at document_idle, so preview almost immediately; AI chats need a
     // moment for the SPA to render the conversation.
@@ -200,6 +206,69 @@ async function ensureFreshTabState(): Promise<TabState> {
 // so we drop the "Saved" state and re-offer capture. null = nothing saved yet.
 let savedTextLength: number | null = null
 const CONTINUATION_MIN_CHARS = 80
+
+// Continuation detection must survive page reloads and service-worker restarts,
+// so the "this chat grew — save the continuation" nudge still appears when you
+// come back to a chat you saved earlier. We persist a tiny per-URL record (the
+// saved length + which space it went to) in chrome.storage.local and rehydrate
+// it on navigation. savedTextLength above is the live, in-memory view.
+const SAVED_STORE_KEY = 'misirSaved'
+const SAVED_STORE_CAP = 300 // bound storage — keep the most-recent N conversations
+interface SavedRecord { len: number; at: number; space?: string; sub?: string; conf?: number }
+
+// Stable key for the current page/conversation: origin + path + query, no hash.
+function savedKey(href = window.location.href): string {
+  try {
+    const u = new URL(href)
+    return u.origin + u.pathname.replace(/\/+$/, '') + u.search
+  } catch {
+    return href
+  }
+}
+
+// Record a successful save so continuation detection survives a reload. Reads the
+// space/subspace from the outcome reportOutcome just set.
+function markSaved(len: number): void {
+  savedTextLength = len
+  void persistSaved(len)
+}
+
+async function persistSaved(len: number): Promise<void> {
+  try {
+    const store = await chrome.storage.local.get(SAVED_STORE_KEY)
+    const map: Record<string, SavedRecord> = store[SAVED_STORE_KEY] || {}
+    map[savedKey()] = {
+      len,
+      at: Date.now(),
+      space: lastSavedOutcome?.spaceName,
+      sub: lastSavedOutcome?.subspaceName,
+      conf: lastSavedOutcome?.confidence,
+    }
+    const keys = Object.keys(map)
+    if (keys.length > SAVED_STORE_CAP) {
+      keys.sort((a, b) => map[a].at - map[b].at) // oldest first
+      for (const k of keys.slice(0, keys.length - SAVED_STORE_CAP)) delete map[k]
+    }
+    await chrome.storage.local.set({ [SAVED_STORE_KEY]: map })
+  } catch {
+    /* best-effort — a failed persist just means no cross-reload nudge */
+  }
+}
+
+// Rehydrate saved state for the current URL after a navigation/reload, so the
+// card can show "Saved" (and detect growth for the continuation nudge).
+async function restoreSaved(): Promise<void> {
+  try {
+    const store = await chrome.storage.local.get(SAVED_STORE_KEY)
+    const rec: SavedRecord | undefined = store[SAVED_STORE_KEY]?.[savedKey()]
+    if (!rec) return
+    savedTextLength = rec.len
+    lastSavedOutcome = { status: 'saved', spaceName: rec.space, subspaceName: rec.sub, confidence: rec.conf }
+    setToolbarOutcome(lastSavedOutcome)
+  } catch {
+    /* ignore — falls back to a normal live preview */
+  }
+}
 
 function conversationText(): string | null {
   const extractor = getExtractor(window.location.href)
@@ -305,6 +374,10 @@ function reportOutcome(result: CaptureResultMessage | undefined, what: string): 
     log.info(
       `Saved ${what} → ${result.spaceName ?? '?'} (${Math.round((result.confidence ?? 0) * 100)}% match)`,
     )
+  } else if (result?.duplicate) {
+    // Already captured recently — NOT a no-match. Say so plainly.
+    setToolbarOutcome({ status: 'duplicate' })
+    log.debug(`${what} already captured recently`)
   } else {
     setToolbarOutcome({ status: 'nomatch' })
     log.debug(`${what} not matched to any space`)
@@ -358,7 +431,7 @@ async function saveAIChat(): Promise<void> {
 
     const result = await sendMessageWithRetry<CaptureResultMessage>(message)
     reportOutcome(result, `${conversation.platform} conversation`)
-    if (result?.matched) savedTextLength = text.length
+    if (result?.matched) markSaved(text.length)
   } catch (err) {
     log.error('Save failed:', err)
   } finally {
@@ -398,7 +471,7 @@ async function saveWebPage(): Promise<void> {
 
     const result = await sendMessageWithRetry<CaptureResultMessage>(message)
     reportOutcome(result, 'web page')
-    if (result?.matched) savedTextLength = pageContent.textContent.length
+    if (result?.matched) markSaved(pageContent.textContent.length)
   } catch (err) {
     log.error('Web capture failed:', err)
   } finally {
@@ -431,7 +504,7 @@ async function handleCorrect(spaceId: number, subspaceId: number): Promise<void>
         ...engagement.snapshot(),
       })
       reportOutcome(result, 'correction')
-      if (result?.matched) savedTextLength = text.length
+      if (result?.matched) markSaved(text.length)
     } else if (currentMode === 'web') {
       const pageContent = await extractPageContent(document, window.location.href)
       if (!pageContent || pageContent.wordCount < MIN_WEB_WORDS) return
@@ -445,7 +518,7 @@ async function handleCorrect(spaceId: number, subspaceId: number): Promise<void>
         ...engagement.snapshot(),
       })
       reportOutcome(result, 'correction')
-      if (result?.matched) savedTextLength = pageContent.textContent.length
+      if (result?.matched) markSaved(pageContent.textContent.length)
     }
   } catch (err) {
     log.error('Correction failed:', err)

@@ -160,6 +160,9 @@ export interface TabState {
 
 export interface CaptureResultMessage {
   matched: boolean
+  /** True when the save was skipped because this page/chat was already captured
+   *  recently — distinct from a genuine no-match so the UI can say so. */
+  duplicate?: boolean
   remoteId?: number
   subspaceId?: number
   spaceName?: string
