@@ -1,4 +1,5 @@
 """Markers + subspace-marker junction routes (Phase 3)."""
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -12,6 +13,46 @@ router = APIRouter(tags=["markers"])
 # Learned markers are lower-confidence than curated ones (default 1.0), so they
 # nudge matching without overpowering the hand-authored/generated vocabulary.
 LEARNED_WEIGHT = 0.6
+
+# Server-side junk filter for learned markers. The extension already POS/NER-gates
+# candidates, but this endpoint is public, so it independently rejects terms that
+# would pollute matching: anything with a digit (dates/years/counts) and lone
+# generic/temporal/stop words. Multi-word phrases are given the benefit of the
+# doubt. Keeps a bad client (or a future caller) from re-introducing noise markers.
+_LEARN_WORD_RE = re.compile(r"^[a-z]+(?:[ -][a-z]+)*$")
+_LEARN_JUNK_WORDS = {
+    # articles / pronouns / generic function-ish words
+    "the", "and", "for", "with", "from", "this", "that", "your", "their", "using",
+    "about", "have", "will", "which", "into", "more", "than", "then", "they", "them",
+    "also", "such", "these", "those", "other", "some", "what", "when", "where", "while",
+    "been", "being", "here", "there", "over", "under", "each", "very", "much", "many",
+    # temporal / quantity
+    "second", "minute", "hour", "day", "week", "month", "year", "decade", "century",
+    "time", "today", "tomorrow", "yesterday", "morning", "afternoon", "evening", "night",
+    "weekend", "season", "spring", "summer", "autumn", "fall", "winter",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "january", "february", "march", "april", "june", "july", "august", "september",
+    "october", "november", "december",
+    "number", "amount", "part", "thing", "stuff", "kind", "type", "example", "lot",
+    # ordinals
+    "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth",
+    "ninth", "tenth",
+    # vague / meta / colours
+    "green", "blue", "red", "black", "white", "page", "site", "website", "article",
+    "post", "user", "assistant", "reader", "http", "https", "www", "com",
+}
+
+
+def _is_learnable(label: str) -> bool:
+    """True if `label` is a plausible topic marker (not a date/number/generic word)."""
+    if not (3 <= len(label) <= 60):
+        return False
+    if not _LEARN_WORD_RE.match(label):  # letters/spaces/hyphens only — no digits
+        return False
+    # Screen lone generic words; allow multi-word phrases through.
+    if " " not in label and (label in _LEARN_JUNK_WORDS or len(label) < 4):
+        return False
+    return True
 
 
 class MarkerCreate(BaseModel):
@@ -100,12 +141,12 @@ def learn_subspace_markers(
     if not sub.data:
         raise HTTPException(status_code=404, detail="Subspace not found")
 
-    # Normalise + dedup the candidate terms.
+    # Normalise, filter junk (dates/numbers/generic words), and dedup.
     labels: list[str] = []
     seen: set[str] = set()
     for t in body.terms:
         label = (t or "").strip().lower()
-        if len(label) < 3 or len(label) > 60 or label in seen:
+        if label in seen or not _is_learnable(label):
             continue
         seen.add(label)
         labels.append(label)

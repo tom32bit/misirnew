@@ -10,7 +10,7 @@ import {
   MAX_SYNC_ATTEMPTS,
 } from '@/lib/db'
 import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
-import { processText } from '@/lib/nlp'
+import { processText, extractLearnableTerms } from '@/lib/nlp'
 import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
 import type { MatchResult } from '@/lib/matching'
 import type { Space, SubspaceWithMarkers } from '@/lib/types'
@@ -442,28 +442,11 @@ interface CorrectMatchMessage {
   baseWeight?: number
 }
 
-// Salient candidate terms from a corrected page → learned markers. Prefers named
-// entities, then the top content lemmas, filtered of noise.
+// Salient candidate terms from a corrected page → learned markers. POS/NER-gated
+// (see extractLearnableTerms) so dates, ordinals, colours and generic words can't
+// become markers and later cause false matches.
 function extractCandidateTerms(text: string): string[] {
-  const r = processText(text)
-  const stop = new Set([
-    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your', 'their', 'using',
-    'about', 'have', 'will', 'which', 'into', 'more', 'than', 'then', 'they', 'them',
-    'also', 'such', 'these', 'those', 'other', 'some', 'what', 'when', 'where', 'while',
-    'been', 'being', 'page', 'site', 'user', 'assistant', 'http', 'https', 'www', 'com',
-  ])
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const t of [...r.entities.map((e) => e.toLowerCase()), ...r.keywords]) {
-    const w = t.trim().toLowerCase()
-    if (w.length < 4 || w.length > 40) continue
-    if (!/^[a-z][a-z0-9 -]*$/.test(w)) continue
-    if (stop.has(w) || seen.has(w)) continue
-    seen.add(w)
-    out.push(w)
-    if (out.length >= 8) break
-  }
-  return out
+  return extractLearnableTerms(text)
 }
 
 async function handleCorrection(msg: CorrectMatchMessage): Promise<CaptureResultMessage> {
