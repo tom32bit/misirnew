@@ -19,6 +19,15 @@ import type {
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string) || 'http://localhost:8000'
 const API_BASE = `${BACKEND_URL}/api/v1`
 
+// Resolve a bearer token. Reads Clerk's `__session` cookie from the web app
+// origin (see lib/auth.ts). NOTE: the sync-host SDK path was pulled out of the
+// service worker — clerk-js references `document` and destabilised the SW
+// (dropped message responses → matching stopped). Sync-host "log in once" will
+// return via an offscreen-document client, which has a real DOM.
+async function authToken(): Promise<string | null> {
+  return getCachedClerkToken()
+}
+
 // Create ky instance with default options
 const api = ky.create({
   prefixUrl: API_BASE,
@@ -31,7 +40,7 @@ const api = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        const token = await getCachedClerkToken()
+        const token = await authToken()
         if (token) {
           request.headers.set('Authorization', `Bearer ${token}`)
         }

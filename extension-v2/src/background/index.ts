@@ -9,7 +9,7 @@ import {
   getFailedArtifacts, getFailedCount, requeueFailedArtifacts, discardFailedArtifacts,
   MAX_SYNC_ATTEMPTS,
 } from '@/lib/db'
-import { apiCapture, apiUpdateEngagement, apiGetCache, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
+import { apiCapture, apiUpdateEngagement, apiGetCache, apiGetMe, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
 import { processText, extractLearnableTerms } from '@/lib/nlp'
 import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
 import type { MatchResult } from '@/lib/matching'
@@ -1036,6 +1036,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SET_CLERK_TOKEN') {
     import('@/lib/auth').then(({ cacheClerkToken }) => cacheClerkToken(message.token))
     return false
+  }
+
+  // Token for extension pages — cookie-based (see authToken in lib/api.ts).
+  if (message.type === 'GET_CLERK_TOKEN') {
+    import('@/lib/auth')
+      .then(({ getCachedClerkToken }) => getCachedClerkToken())
+      .then((token) => sendResponse({ token }))
+      .catch(() => sendResponse({ token: null }))
+    return true
+  }
+
+  // Signed-in status — drives the popup's sign-in prompt. Rather than guess from
+  // the (fragile, 60s-expiry) session cookie, we probe a real authenticated
+  // endpoint: GET /me 403s ONLY on auth (no consent logic), so a 200 means we can
+  // truly authenticate and a 401/403 means we can't. A network error is "unknown"
+  // → we don't nag. This is ground truth, and the popup only polls it while the
+  // prompt is showing, so it clears the instant sign-in takes effect.
+  if (message.type === 'GET_AUTH_STATE') {
+    apiGetMe()
+      .then(() => sendResponse({ signedIn: true }))
+      .catch((e: any) => {
+        const status = e?.response?.status
+        sendResponse({ signedIn: !(status === 401 || status === 403) })
+      })
+    return true
   }
 
   if (message.type === 'CAPTURE_PAGE') {

@@ -285,7 +285,19 @@ function ToolbarComponent({ onSaveClick, onCorrect, isVisible, isSaving, outcome
         ) : (
           <>
             {saved ? (
-              <div className="misir-saved"><Check />Saved to your library</div>
+              continued ? (
+                <button
+                  className={`misir-btn${isSaving ? ' misir-btn--spin' : ''}`}
+                  onClick={handleClick}
+                  disabled={isSaving}
+                  aria-label="Save the continuation"
+                >
+                  {isSaving ? <Loader2 /> : <Save />}
+                  {isSaving ? 'Saving…' : 'Save the continuation'}
+                </button>
+              ) : (
+                <div className="misir-saved"><Check />Saved to your library</div>
+              )
             ) : nomatch ? null : (
               <button
                 className={`misir-btn${isSaving ? ' misir-btn--spin' : ''}`}
@@ -319,6 +331,9 @@ let outcome: SaveOutcome | null = null
 let preview: MatchPreview | null = null
 let checking = false
 let hasSaved = false
+// The saved conversation/page has grown since we saved it — keep showing "Saved"
+// but offer to save the newly-added content (reliable even if a re-match fails).
+let continued = false
 let outcomeTimer: ReturnType<typeof setTimeout> | null = null
 // Hold the real handlers at module scope so every re-render reuses them.
 // (Previously each state change re-rendered with a no-op, disabling the button.)
@@ -393,6 +408,7 @@ export function setToolbarChecking(next: boolean): void {
 export function setToolbarOutcome(next: SaveOutcome): void {
   outcome = next
   isSaving = false
+  continued = false // a fresh outcome supersedes any pending "continue" state
   if (outcomeTimer) {
     clearTimeout(outcomeTimer)
     outcomeTimer = null
@@ -417,6 +433,18 @@ export function clearToolbarOutcome(): void {
     outcomeTimer = null
   }
   outcome = null
+  continued = false
+  renderToolbar()
+}
+
+// The saved conversation/page has continued. Keep the "Saved to X" context but
+// swap the static confirmation for a "Save the continuation" action. Unlike
+// clearing the outcome, this never strands the card in a bare/idle preview when
+// a fresh live match would fail (common on streaming chats).
+export function setToolbarContinuation(): void {
+  if (!outcome || outcome.status !== 'saved') return
+  if (continued) return
+  continued = true
   renderToolbar()
 }
 

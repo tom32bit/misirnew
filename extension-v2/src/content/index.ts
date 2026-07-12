@@ -7,7 +7,7 @@
  */
 
 import { createConsola } from 'consola'
-import { initToolbar, showToolbar, hideToolbar, setToolbarSaving, setToolbarOutcome, setToolbarPreview, setToolbarChecking, clearToolbarOutcome, resetToolbarSaveState, destroyToolbar, type SaveOutcome, type MatchPreview } from './toolbar'
+import { initToolbar, showToolbar, hideToolbar, setToolbarSaving, setToolbarOutcome, setToolbarPreview, setToolbarChecking, setToolbarContinuation, resetToolbarSaveState, destroyToolbar, type SaveOutcome, type MatchPreview } from './toolbar'
 import { extractPageContent } from './web-capture'
 import { extractConversation, getExtractor } from './extractors'
 import { detectPlatform } from './platform-detector'
@@ -136,7 +136,7 @@ async function checkPlatform(): Promise<void> {
     // are ready at document_idle, so preview almost immediately; AI chats need a
     // moment for the SPA to render the conversation.
     lastPreviewHash = null
-    schedulePreview(mode === 'aichat' ? 1200 : 200)
+    schedulePreview(mode === 'aichat' ? 600 : 200)
   } else {
     setToolbarPreview(null)
   }
@@ -271,12 +271,15 @@ async function restoreSaved(): Promise<void> {
 }
 
 function conversationText(): string | null {
-  const extractor = getExtractor(window.location.href)
-  if (!extractor) return null
-  const conversationId = extractor.getConversationId(window.location.href)
-  if (!conversationId) return null
+  const url = window.location.href
+  const extractor = getExtractor(url)
+  // These three are the usual reasons a chat preview "doesn't start" — log them
+  // to the page console so it's diagnosable (open DevTools on the chat tab).
+  if (!extractor) { log.debug('preview: no extractor matches URL', url); return null }
+  const conversationId = extractor.getConversationId(url)
+  if (!conversationId) { log.debug('preview: no conversation id yet (new/unsaved chat?)', url); return null }
   const messages = extractor.extractFromDOM()
-  if (messages.length === 0) return null
+  if (messages.length === 0) { log.debug('preview: extractor found 0 messages in the DOM'); return null }
   return messages.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')
 }
 
@@ -312,18 +315,19 @@ async function refreshPreview(): Promise<void> {
   const text = await previewText()
   if (!text) { setChecking(false); lastPreview = null; setToolbarPreview(null); return }
 
-  // "Capture further": if we've already saved this page/chat and the visible
-  // content has since grown, the conversation (or article) continued — clear the
-  // persistent "Saved" state so the card offers to capture the continuation.
-  // If it hasn't grown, keep showing "Saved" and skip the match query entirely.
+  // "Capture further": once we've saved this page/chat, don't run fresh live
+  // matches — instead watch for growth. If the visible content has grown past our
+  // saved length, the conversation/article continued: keep the "Saved to X"
+  // context and offer to save the continuation (setToolbarContinuation, which
+  // never strands the card in a bare idle preview when a re-match would fail).
+  // If it hasn't grown, keep showing "Saved". Either way, stop here.
   if (savedTextLength != null) {
     if (text.length > savedTextLength + CONTINUATION_MIN_CHARS) {
       continuationPending = true
-      clearToolbarOutcome()
-    } else {
-      setChecking(false)
-      return
+      setToolbarContinuation()
     }
+    setChecking(false)
+    return
   }
 
   // Skip re-querying if the content hasn't materially changed.
@@ -345,11 +349,22 @@ async function refreshPreview(): Promise<void> {
   }
 }
 
-function schedulePreview(delay = 800): void {
+let previewMaxTimer: ReturnType<typeof setTimeout> | null = null
+
+function runRefreshPreview(): void {
+  if (previewTimer) { clearTimeout(previewTimer); previewTimer = null }
+  if (previewMaxTimer) { clearTimeout(previewMaxTimer); previewMaxTimer = null }
+  refreshPreview().catch((err) => log.error('Preview error:', err))
+}
+
+// Debounce (fire shortly after mutations settle) PLUS a max-wait ceiling: while a
+// response is still streaming and the DOM never settles, we still refresh at least
+// every ~1.6s so the match shows up live mid-stream instead of only at the end.
+// refreshPreview's content-hash guard keeps this from re-matching identical text.
+function schedulePreview(delay = 450): void {
   if (previewTimer) clearTimeout(previewTimer)
-  previewTimer = setTimeout(() => {
-    refreshPreview().catch((err) => log.error('Preview error:', err))
-  }, delay)
+  previewTimer = setTimeout(runRefreshPreview, delay)
+  if (!previewMaxTimer) previewMaxTimer = setTimeout(runRefreshPreview, 1600)
 }
 
 // Watch the page for new/streamed messages; the observer lives on document.body,

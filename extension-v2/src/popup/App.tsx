@@ -2,7 +2,7 @@ import React from 'react'
 import {
   Settings, ExternalLink, Loader2, ShieldAlert, Globe, Sparkles,
   Bookmark, Check, Plus, ScanLine, Terminal, RefreshCw, Copy,
-  AlertTriangle, Trash2, FileWarning,
+  AlertTriangle, Trash2, FileWarning, LogIn,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { db, getPendingCount } from '@/lib/db'
@@ -40,6 +40,8 @@ export function PopupApp() {
   const [continuing, setContinuing] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  // null = unknown yet; false = signed out (show sign-in prompt).
+  const [signedIn, setSignedIn] = React.useState<boolean | null>(null)
   const [showLog, setShowLog] = React.useState(false)
   const [logLines, setLogLines] = React.useState<string[]>([])
   const [copied, setCopied] = React.useState(false)
@@ -92,6 +94,22 @@ export function PopupApp() {
     setSmartDismissed(true)
     chrome.storage.local.set({ misirSmartMatchDismissed: true }).catch(() => {})
   }
+
+  // While the sign-in prompt is showing, re-probe auth so it clears on its own
+  // the moment sign-in takes effect — no reopen, no manual dismiss. We stop
+  // polling once signed in, so /me isn't hit repeatedly when it's not needed.
+  React.useEffect(() => {
+    if (signedIn !== false) return
+    const id = setInterval(() => {
+      chrome.runtime
+        .sendMessage({ type: 'GET_AUTH_STATE' })
+        .then((r: { signedIn?: boolean } | undefined) => {
+          if (r && typeof r.signedIn === 'boolean') setSignedIn(r.signedIn)
+        })
+        .catch(() => {})
+    }, 3000)
+    return () => clearInterval(id)
+  }, [signedIn])
 
   // Recover a degraded model: force a clean reload (re-inits, re-downloads if the
   // browser evicted the cache). Reuses the same progress plumbing as first enable.
@@ -222,6 +240,13 @@ export function PopupApp() {
       setSemanticDegraded(!!(semStatus as { degraded?: boolean })?.degraded)
       setSmartDismissed(!!dismiss.misirSmartMatchDismissed)
       await loadFailedSaves()
+
+      // Auth: default to "signed in" if the SW doesn't answer, so we don't nag
+      // during a slow wake-up — only prompt when we KNOW there's no session.
+      const auth = (await chrome.runtime
+        .sendMessage({ type: 'GET_AUTH_STATE' })
+        .catch(() => ({ signedIn: true }))) as { signedIn?: boolean }
+      setSignedIn(auth?.signedIn !== false)
       try {
         await apiGetConsent()
       } catch {
@@ -322,6 +347,8 @@ export function PopupApp() {
         <SyncPill lastSyncedMs={lastSyncedMs} />
       </div>
       <Divider />
+
+      <SignInBanner signedIn={signedIn} />
 
       <SmartMatchBanner
         ready={semanticReady}
@@ -869,6 +896,44 @@ function FailedSavesBanner({
               Discard
             </button>
           </div>
+        </div>
+      </div>
+      <Divider />
+    </>
+  )
+}
+
+// Shown when there's no synced Clerk session. The extension can't do anything
+// without auth, so we point the user to sign in ONCE on the web app — the sync
+// host then keeps the extension connected (no tab needed afterward).
+// Auto-hides the moment we can authenticate (the popup re-checks live), so
+// signing in on the web app clears it on its own — no manual dismiss needed.
+function SignInBanner({ signedIn }: { signedIn: boolean | null }) {
+  if (signedIn !== false) return null
+  const host = (import.meta.env.VITE_CLERK_SYNC_HOST as string) || 'https://misir.app'
+  return (
+    <>
+      <div style={{ padding: '14px 15px' }}>
+        <div style={{ borderRadius: 13, background: C.accentSoft, border: '1px solid rgba(217,119,87,0.22)', padding: '14px 14px 15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+            <span style={{ width: 26, height: 26, flex: 'none', borderRadius: 8, background: 'rgba(217,119,87,0.18)', color: C.accent2, display: 'grid', placeItems: 'center' }}>
+              <LogIn size={15} />
+            </span>
+            <span style={{ fontFamily: SERIF, fontSize: 15, color: C.text, letterSpacing: '-0.005em' }}>Sign in to Misir</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: C.text2 }}>
+            Capture needs you signed in. Open the Misir app and sign in — keep that tab open while you capture.
+          </p>
+          <button
+            onClick={() => chrome.tabs.create({ url: `${host}/sign-in` })}
+            style={{
+              marginTop: 13, width: '100%', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+              justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 10, background: C.accent,
+              color: '#fff', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+            }}
+          >
+            <LogIn size={14} />Sign in
+          </button>
         </div>
       </div>
       <Divider />
