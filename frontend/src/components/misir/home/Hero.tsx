@@ -122,13 +122,17 @@ export function Hero({
             {totalCritical === 1 ? "" : "s"}
           </span>
         </div>
+
+        <CaptureRhythm vms={vms} />
       </div>
 
-      {/* Right column — space ring buttons */}
+      {/* Right column — spaces, ordered by momentum */}
       <div className="flex flex-col gap-2 mobile:flex-row mobile:flex-wrap">
-        {vms.map((v) => (
-          <SpaceRingButton key={v.space.id} vm={v} />
-        ))}
+        {[...vms]
+          .sort((a, b) => b.readiness - a.readiness || b.capturesWeek - a.capturesWeek)
+          .map((v) => (
+            <SpaceRingButton key={v.space.id} vm={v} />
+          ))}
         {vms.length === 0 && (
           <div className="text-[12px] text-fg-subtle">No spaces yet.</div>
         )}
@@ -137,26 +141,100 @@ export function Hero({
   )
 }
 
+/**
+ * Capture rhythm — a real 14-day histogram of when you captured, bucketed from
+ * the actual `activity[].time` (captured_at) timestamps across all spaces. It
+ * only renders when there ARE dated captures to show; if the data has no parsable
+ * dates it hides itself rather than fake a chart.
+ */
+function CaptureRhythm({ vms }: { vms: SpaceVM[] }) {
+  const DAYS = 14
+  const counts = new Array(DAYS).fill(0)
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  let total = 0
+
+  for (const vm of vms) {
+    for (const a of vm.dashboard?.activity ?? []) {
+      const t = new Date(a.time)
+      if (Number.isNaN(t.getTime())) continue
+      const dayStart = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime()
+      const daysAgo = Math.round((todayStart - dayStart) / 86_400_000)
+      if (daysAgo >= 0 && daysAgo < DAYS) {
+        counts[DAYS - 1 - daysAgo] += 1
+        total += 1
+      }
+    }
+  }
+
+  if (total === 0) return null
+  const max = Math.max(...counts, 1)
+
+  return (
+    <div className="mt-[34px] border-t border-border pt-6">
+      <div className="mb-3.5 flex items-baseline justify-between">
+        <span className="font-serif text-[14px] text-fg-muted">Capture rhythm</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-subtle">
+          Last {DAYS} days
+        </span>
+      </div>
+      <div className="flex h-[54px] items-end gap-[5px]">
+        {counts.map((c, i) => {
+          const h = c === 0 ? 3 : 8 + (c / max) * 44
+          const isToday = i === DAYS - 1
+          return (
+            <div
+              key={i}
+              title={`${c} capture${c === 1 ? "" : "s"}`}
+              className="flex-1 rounded-[3px]"
+              style={{
+                height: h,
+                background: c === 0 ? "var(--border-strong)" : "#FF6C3C",
+                opacity: c === 0 ? 0.45 : isToday ? 1 : 0.85,
+              }}
+            />
+          )
+        })}
+      </div>
+      <div className="mt-2 flex justify-between font-mono text-[10px] text-fg-subtle">
+        <span>2 weeks ago</span>
+        <span>today</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Readiness → the phase a space is in. Encoding momentum (rather than a uniform
+ * "On track") is the whole point of the ring: at a glance you can see which
+ * spaces are just seeds and which are maturing.
+ */
+function readinessTier(pct: number): { label: string; color: string } {
+  if (pct <= 0) return { label: "Just started", color: "#8A857B" }
+  if (pct < 15) return { label: "Seedling", color: "#B8730D" }
+  if (pct < 30) return { label: "Building", color: "#FF6C3C" }
+  if (pct < 60) return { label: "On track", color: "#2E7D55" }
+  return { label: "Ready", color: "#2E7D55" }
+}
+
 function SpaceRingButton({ vm }: { vm: SpaceVM }) {
-  const color = getSpaceColor(vm.space)
-  const status =
-    vm.criticalGaps > 0 ? (
-      <span style={{ color }}>{vm.criticalGaps} critical</span>
-    ) : (
-      <span className="text-success">On track</span>
-    )
+  const tier = readinessTier(vm.readiness)
+  const hasCritical = vm.criticalGaps > 0
+  // Critical gaps take over the colour (they're the thing to act on); otherwise
+  // the ring shows the readiness phase.
+  const ringColor = hasCritical ? getSpaceColor(vm.space) : tier.color
 
   return (
     <Link
       href={`/dashboard/${vm.space.id}/home`}
       className="group flex items-center gap-3 rounded-lg border border-border bg-bg-subtle px-3.5 py-2.5 text-left transition-colors hover:bg-bg-muted mobile:flex-1 mobile:min-w-[140px]"
-      style={{ ["--sc" as string]: color }}
+      style={{ ["--sc" as string]: ringColor }}
     >
       <ReadinessRing
         value={vm.readiness}
         size={36}
         thickness={5}
-        color={color}
+        color={ringColor}
         showPercent
         fontSize={10}
         trackColor="var(--border-strong)"
@@ -166,9 +244,23 @@ function SpaceRingButton({ vm }: { vm: SpaceVM }) {
           {vm.space.name}
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide">
-          {status}
+          {hasCritical ? (
+            <span style={{ color: getSpaceColor(vm.space) }}>
+              {vm.criticalGaps} critical
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5" style={{ color: tier.color }}>
+              <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: tier.color }} />
+              {tier.label}
+            </span>
+          )}
         </div>
       </div>
+      {vm.capturesWeek > 0 && (
+        <span className="flex-none font-mono text-[10px] tracking-wide text-fg-subtle">
+          {vm.capturesWeek}
+        </span>
+      )}
     </Link>
   )
 }

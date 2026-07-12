@@ -178,9 +178,17 @@ export function InsightList({
                     </span>
                   ))}
                 </div>
-                <p className="m-0 font-serif text-[14px] italic leading-[1.6] text-fg [text-wrap:pretty]">
-                  {ins.text}
-                </p>
+                {ins.type === "synthesis" ? (
+                  // The synthesis consensus is the most valuable thing here —
+                  // give it editorial weight as an upright, quoted pull-quote.
+                  <p className="m-0 font-serif text-[16px] leading-[1.5] text-fg [text-wrap:pretty]">
+                    {"“"}{ins.text}{"”"}
+                  </p>
+                ) : (
+                  <p className="m-0 font-serif text-[14px] italic leading-[1.6] text-fg [text-wrap:pretty]">
+                    {ins.text}
+                  </p>
+                )}
               </div>
               <span
                 className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border bg-transparent px-3.5 py-1.5 text-[12px] font-medium mobile:self-start"

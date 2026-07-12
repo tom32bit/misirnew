@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/adapters"
 import { Hero } from "./Hero"
 import { InsightList } from "./InsightList"
+import { StatStrip, UpNext, Connections, RecentCaptures, Tensions } from "./HomePanels"
 
 /**
  * Build a single dashboard-derived view-model for each space so all
@@ -72,7 +73,12 @@ export function HomeAll() {
         totalCaptures={totalCaptures}
         totalCritical={totalCritical}
       />
+      <StatStrip vms={vms} totalCaptures={totalCaptures} />
+      <UpNext vms={vms} />
       <InsightList vms={vms} period={period} />
+      <Connections vms={vms} />
+      <RecentCaptures vms={vms} />
+      <Tensions vms={vms} />
     </>
   )
 }
