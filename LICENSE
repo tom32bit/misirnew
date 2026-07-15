@@ -1,0 +1,43 @@
+Copyright (c) 2026 Misir. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its source code, documentation, design assets, and all
+accompanying materials (collectively, the "Software") are the proprietary and
+confidential property of Misir (the "Company").
+
+NO LICENSE IS GRANTED. No right, title, or interest in the Software is
+transferred to any party except under a separate written agreement signed by
+an authorized representative of the Company. Possession of, or access to, the
+Software does not grant any license to it.
+
+Without the Company's prior express written permission, you may not:
+
+  1. use, execute, or run the Software for any purpose;
+  2. copy, reproduce, publish, or distribute the Software, in whole or in part;
+  3. modify, adapt, translate, or create derivative works of the Software;
+  4. reverse engineer, decompile, or disassemble the Software, except to the
+     extent this restriction is unenforceable under applicable law;
+  5. sell, rent, lease, sublicense, or otherwise transfer the Software; or
+  6. remove, obscure, or alter any proprietary notice contained in the Software.
+
+The Software is a trade secret of the Company. Any person granted access to the
+Software is obligated to maintain its confidentiality and to use it solely for
+purposes authorized in writing by the Company. Unauthorized use, reproduction,
+or disclosure may result in civil liability and criminal penalties, and will be
+prosecuted to the maximum extent possible under the law.
+
+THIRD-PARTY MATERIALS. The Software incorporates third-party components,
+including open-source software, fonts, and models, which remain the property of
+their respective owners and are governed by their own licenses and terms. Those
+licenses are not superseded by this notice, and nothing here grants rights to
+any third-party material. See "Third-Party Notices" in README.md.
+
+NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE COMPANY BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing enquiries, contact the Company.
