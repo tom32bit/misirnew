@@ -1,6 +1,5 @@
 /**
  * Map an artifact's platform/domain to a lucide icon name.
- * Ported from `design_handoff_misir/dashboard/data.js#surfaceIcon`.
  */
 
 import type { Artifact, PlatformType } from "@/lib/api/types"

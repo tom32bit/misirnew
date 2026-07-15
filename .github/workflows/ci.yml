@@ -48,28 +48,8 @@ jobs:
       - run: npx tsc --noEmit
         continue-on-error: true
 
-  extension:
-    name: Extension v1 (build + tests)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: extention
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      # No committed lockfile yet (see R10) — use install, not ci.
-      - run: npm install
-      # The real shipped artifact (esbuild) — this is the meaningful gate.
-      - run: npm run build
-      - run: npx vitest run
-      # Strict type-check reported but non-blocking (pre-existing type debt).
-      - run: npx tsc --noEmit
-        continue-on-error: true
-
   extension-v2:
-    name: Extension v2 (typecheck + tests + build)
+    name: Extension (typecheck + tests + build)
     runs-on: ubuntu-latest
     defaults:
       run:
