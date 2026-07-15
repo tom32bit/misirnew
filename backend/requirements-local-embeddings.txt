@@ -1,0 +1,16 @@
+# Local in-process embeddings — EMBEDDING_PROVIDER=local.
+#
+# Adds the torch stack (~2GB installed) that runs nomic-embed-text-v1.5 in this
+# process instead of calling Nomic's hosted API. Only needed if you want to
+# embed offline / keep artifact text off a third party, and only viable on a
+# host with ~1-1.5GB of spare RAM — it is why the free-tier deploy uses
+# EMBEDDING_PROVIDER=nomic and installs requirements.txt alone.
+#
+# Same model and 768 dims either way, so switching providers needs no
+# re-embedding of existing rows.
+#
+#   pip install -r requirements-local-embeddings.txt
+
+-r requirements.txt
+
+sentence-transformers==3.3.1

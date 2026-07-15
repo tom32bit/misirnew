@@ -17,8 +17,13 @@ pydantic-settings==2.7.0
 # LLM
 groq==0.13.1
 
-# Embeddings (optional — comment out if not running locally)
-sentence-transformers==3.3.1
+# Embeddings — REQUIRED. numpy is imported at module top-level by
+# embedding_service and cross_space_linker; removing it breaks startup.
+# This file deliberately does NOT pull sentence-transformers (and therefore
+# torch, ~2GB): it is only needed for EMBEDDING_PROVIDER=local, whose import is
+# lazy (embedding_service._load_model). Deployments run EMBEDDING_PROVIDER=nomic
+# and fit small-RAM hosts. For local in-process embeddings, install
+# requirements-local-embeddings.txt instead.
 numpy==2.2.1
 
 # Rate limiting

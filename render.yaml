@@ -1,0 +1,65 @@
+# Render blueprint — free-tier backend.
+#
+# Native Python runtime, not Docker: Render builds from requirements.txt
+# directly, which is faster than an image build and needs no registry. The
+# backend Dockerfile is still there and still valid for hosts that want it.
+#
+# Free plan realities to expect:
+#   - 512MB RAM / 0.1 CPU. Fits ONLY because EMBEDDING_PROVIDER=nomic keeps the
+#     ~1-1.5GB torch model out of the process (requirements.txt omits
+#     sentence-transformers; the import in embedding_service is lazy).
+#   - The service sleeps after ~15 min idle; the next request pays a 30-50s
+#     cold start. The extension's capture retry queue absorbs this.
+#   - One instance only. JOB_QUEUE_ENABLED stays false (a worker would be a
+#     second paid service) so post-capture embed/synthesis run as in-process
+#     BackgroundTasks — which is also why this must be a web service and not
+#     anything serverless: BackgroundTasks die when the process does.
+#
+# Secrets (sync: false) are NOT in this file — set them in the Render dashboard
+# once, and they persist across deploys.
+
+services:
+  - type: web
+    name: misir-backend
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Mirrors backend/Procfile. --forwarded-allow-ips="*" makes the IP-keyed
+    # rate limit see real client IPs via X-Forwarded-For; safe here because the
+    # instance is reachable only through Render's router, which sets them.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+
+      # ── Embeddings — the setting that makes the free plan viable ──────────
+      # 'local' would need the torch stack this deploy does not install.
+      - key: EMBEDDING_PROVIDER
+        value: nomic
+      - key: NOMIC_API_KEY
+        sync: false
+
+      # ── Required services ────────────────────────────────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY      # service-role key; the backend is the trust boundary
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CLERK_SECRET_KEY          # only needed for DELETE /me identity erasure
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # ── Single-instance defaults ─────────────────────────────────────────
+      # No free Redis: keep the limiter in-process and the job queue off.
+      - key: RATE_LIMIT_STORAGE
+        value: memory
+      - key: JOB_QUEUE_ENABLED
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
