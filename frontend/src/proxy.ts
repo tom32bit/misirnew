@@ -1,6 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
 const isPublic = createRouteMatcher([
+  // Exactly "/" — the landing page. Signed-out visitors must reach it, while the
+  // page itself redirects signed-in users on to /dashboard. Not "/(.*)", which
+  // would make the entire app public.
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
