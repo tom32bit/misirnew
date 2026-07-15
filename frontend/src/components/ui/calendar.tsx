@@ -58,7 +58,7 @@ function Calendar({
           defaultClassNames.dropdowns,
         ),
         dropdown_root: cn(
-          "relative rounded-md border border-[var(--border-strong)] has-focus:border-[#61AAF2]",
+          "relative rounded-md border border-[var(--border-strong)] has-focus:border-[var(--color-ring)]",
           defaultClassNames.dropdown_root,
         ),
         dropdown: cn("absolute inset-0 bg-bg-subtle opacity-0", defaultClassNames.dropdown),
@@ -146,7 +146,7 @@ function CalendarDayButton({
         "data-[range-start=true]:rounded-l-md data-[range-start=true]:bg-accent data-[range-start=true]:text-fg-on-accent",
         "data-[range-end=true]:rounded-r-md data-[range-end=true]:bg-accent data-[range-end=true]:text-fg-on-accent",
         "data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-[var(--color-accent-soft)]",
-        "group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:shadow-[0_0_0_2px_#61AAF2]",
+        "group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:shadow-[0_0_0_2px_var(--color-ring)]",
         "[&>span]:text-[10px] [&>span]:opacity-70",
         defaultClassNames.day,
         className,

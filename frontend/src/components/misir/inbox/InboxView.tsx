@@ -23,6 +23,7 @@ import {
   type SegmentOption,
 } from "@/components/misir/primitives/FilterBar"
 import { SpaceTag } from "@/components/misir/primitives/Tag"
+import { Skeleton } from "@/components/misir/primitives/Skeleton"
 import { useInbox } from "@/lib/hooks/useInbox"
 import { isConversationUnread } from "@/lib/hooks/useUnreadCounts"
 import { useSpaces } from "@/lib/hooks/useSpaces"
@@ -82,6 +83,7 @@ export function InboxView({ scope }: { scope: Scope }) {
   return (
     <>
       <SectionHead
+        icon="inbox"
         title="Inbox"
         small="All conversations with Misir"
         right={
@@ -131,7 +133,23 @@ export function InboxView({ scope }: { scope: Scope }) {
           </FilterCount>
         </FilterBar>
 
-        {filtered.length === 0 ? (
+        {inbox.isLoading ? (
+          // Row-shaped skeletons — never present "loading" as "empty".
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="grid items-center gap-3.5 border-b border-border px-[18px] py-3 last:border-b-0 mobile:grid-cols-[14px_1fr] mobile:gap-2.5"
+              style={{ gridTemplateColumns: "18px 1fr 120px" }}
+            >
+              <Skeleton className="h-[6px] w-[6px] rounded-full" />
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-3.5 w-2/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+              <Skeleton className="h-3 w-16 justify-self-end mobile:hidden" />
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
           <div className="px-6 py-8 text-center text-[13px] text-fg-subtle">
             {total === 0 ? "No chats yet. Start one." : "No chats match."}
           </div>
@@ -177,7 +195,7 @@ function InboxRow({
           onClick()
         }
       }}
-      className="grid cursor-pointer items-center gap-3.5 border-b border-border px-[18px] py-3 transition-colors last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[14px_1fr] mobile:gap-2.5"
+      className="grid cursor-pointer items-center gap-3.5 border-b border-border px-[18px] py-3 transition-colors last:border-b-0 hover:bg-bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--color-focus)] mobile:grid-cols-[14px_1fr] mobile:gap-2.5"
       style={{ gridTemplateColumns: "18px 1fr 120px" }}
     >
       <span

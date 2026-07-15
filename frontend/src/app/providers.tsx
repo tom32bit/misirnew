@@ -3,6 +3,7 @@
 import { ClerkProvider } from "@clerk/nextjs"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
+import { MotionConfig } from "motion/react"
 import { Toaster } from "sonner"
 import { useState } from "react"
 
@@ -26,7 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ClerkProvider
       appearance={{
         variables: {
-          colorPrimary: "#FF6C3C",
+          colorPrimary: "#D97757",
           colorBackground: "var(--bg)",
           colorText: "var(--fg)",
           colorTextSecondary: "var(--fg-muted)",
@@ -38,7 +39,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <QueryClientProvider client={queryClient}>
-        {children}
+        {/* Honors the OS "reduce motion" setting for all transform/layout
+            animations app-wide; value-based sweeps opt in via useReducedMotion. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
         <Toaster
           position="bottom-right"
           theme="system"

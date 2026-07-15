@@ -26,14 +26,14 @@ function Column({
   title: string
   items: string[]
 }) {
-  const ringColor = tone === "success" ? "var(--success)" : "var(--danger)"
-  const ringBg =
-    tone === "success" ? "rgba(46,125,85,0.1)" : "rgba(192,57,43,0.08)"
+  const ringColor =
+    tone === "success" ? "var(--color-success)" : "var(--color-danger)"
+  const ringBg = `color-mix(in srgb, ${ringColor} 10%, transparent)`
   const icon = tone === "success" ? "check" : "x"
 
   return (
     <div
-      className="overflow-hidden rounded-lg border border-border bg-bg"
+      className="overflow-hidden rounded-panel border border-border bg-bg"
       style={{ borderTop: `3px solid ${ringColor}` }}
     >
       <div className="flex items-center gap-2.5 border-b border-border px-[18px] py-3.5">

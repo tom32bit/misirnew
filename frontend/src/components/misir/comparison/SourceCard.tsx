@@ -1,6 +1,7 @@
 "use client"
 
-import { Card } from "@/components/misir/primitives/Card"
+import { Card, ProgressBar } from "@/components/misir/primitives/Card"
+import { CountUp } from "@/components/misir/primitives/CountUp"
 import type { SourceVM } from "./ComparisonView"
 
 export function SourceCard({
@@ -20,8 +21,8 @@ export function SourceCard({
           <span className="font-serif text-[14px] font-semibold text-fg">
             {source.label}
           </span>
-          <span className="rounded-full border border-border bg-bg-muted px-2 py-0.5 font-sans text-[10px] font-semibold text-fg">
-            {source.count} artifact{source.count === 1 ? "" : "s"}
+          <span className="rounded-full border border-border bg-bg-muted px-2 py-0.5 font-sans text-[10px] font-semibold tabular-nums text-fg">
+            <CountUp value={source.count} /> artifact{source.count === 1 ? "" : "s"}
           </span>
         </div>
         {source.summary && (
@@ -46,15 +47,11 @@ export function SourceCard({
                 style={{ gridTemplateColumns: "44px 1fr" }}
               >
                 <div>
-                  <div className="font-sans text-[11px] font-semibold text-fg">
-                    {f.conf}%
+                  <div className="font-sans text-[11px] font-semibold tabular-nums text-fg">
+                    <CountUp value={f.conf} suffix="%" />
                   </div>
-                  <div className="mt-0.5 h-[3px] overflow-hidden rounded-sm bg-border-strong">
-                    <div
-                      className="h-full bg-accent"
-                      style={{ width: `${f.conf}%` }}
-                    />
-                  </div>
+                  {/* Confidence bar carries the source's own colour, like the card. */}
+                  <ProgressBar value={f.conf} color={color} className="mt-0.5" />
                 </div>
                 <div className="font-serif text-[12.5px] leading-[1.45] text-fg-muted">
                   {f.text}
@@ -67,7 +64,7 @@ export function SourceCard({
 
       {source.signal && (
         <div
-          className="mx-4 mb-4 rounded-r-md bg-bg-subtle px-3.5 py-3 dark:bg-bg-inset"
+          className="mx-4 mb-4 rounded-md bg-bg-subtle px-3.5 py-3 dark:bg-bg-inset"
           style={{ borderLeft: `3px solid var(--accent)` }}
         >
           <div className="mb-1 font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg">

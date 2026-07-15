@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "motion/react"
 import { Icon } from "@/components/misir/primitives/Icon"
+import { DUR, SPRING } from "@/lib/motion"
 
 /**
  * Modal primitive — scrim + centered card with motion animations.
@@ -57,7 +58,7 @@ export function ModalShell({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
+            transition={{ duration: DUR.fast }}
             onClick={onClose}
             className="fixed inset-0 z-[200] bg-[rgba(20,18,16,0.45)] backdrop-blur-[2px]"
           />
@@ -72,8 +73,13 @@ export function ModalShell({
               aria-label={ariaLabel}
               initial={{ opacity: 0, y: 8, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.2, ease: [0.2, 0.7, 0.2, 1] }}
+              exit={{
+                opacity: 0,
+                y: 8,
+                scale: 0.98,
+                transition: { duration: DUR.fast },
+              }}
+              transition={SPRING.smooth}
               data-variant="sheet"
               className="misir-modal-card pointer-events-auto flex max-h-[calc(100vh-48px)] w-[560px] max-w-full flex-col overflow-hidden rounded-xl border border-border-strong bg-bg shadow-pop"
               onClick={(e) => e.stopPropagation()}

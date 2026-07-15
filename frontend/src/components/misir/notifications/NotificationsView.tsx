@@ -16,6 +16,14 @@ import {
   type SegmentOption,
 } from "@/components/misir/primitives/FilterBar"
 import { SpaceTag } from "@/components/misir/primitives/Tag"
+import { Skeleton } from "@/components/misir/primitives/Skeleton"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useNudges, useMarkNudgesSeen } from "@/lib/hooks/useNudges"
 import { useGaps } from "@/lib/hooks/useGaps"
 import { useSpaces } from "@/lib/hooks/useSpaces"
@@ -173,6 +181,7 @@ export function NotificationsView({ scope }: { scope: Scope }) {
   return (
     <>
       <SectionHead
+        icon="bell"
         title="Notifications"
         small="Alerts, nudges, and gaps Misir is watching"
         right={
@@ -196,25 +205,41 @@ export function NotificationsView({ scope }: { scope: Scope }) {
         <FilterBar>
           <Segmented value={filter} onChange={setFilter} options={segOpts} />
           {isAll && spaces.length > 0 && (
-            <select
-              value={spaceFilter}
-              onChange={(e) => setSpaceFilter(e.target.value)}
-              className="h-7 cursor-pointer rounded-md border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none focus:border-accent"
-            >
-              <option value="all">All spaces</option>
-              {spaces.map((s) => (
-                <option key={s.id} value={String(s.id)}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <Select value={spaceFilter} onValueChange={setSpaceFilter}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All spaces</SelectItem>
+                {spaces.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           <FilterCount>
             {filtered.length} of {rows.length}
           </FilterCount>
         </FilterBar>
 
-        {filtered.length === 0 ? (
+        {nudges.isLoading || (!isAll && gaps.isLoading) ? (
+          // Row-shaped skeletons — never present "loading" as "empty".
+          Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0"
+            >
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <div className="flex flex-1 flex-col gap-2">
+                <Skeleton className="h-3.5 w-2/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+              <Skeleton className="h-7 w-20 rounded-md" />
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
           <div className="px-6 py-8 text-center text-[13px] text-fg-subtle">
             {rows.length === 0
               ? "Misir hasn't noticed anything urgent yet."

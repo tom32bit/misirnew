@@ -20,7 +20,10 @@ export default function DashboardError({
   }, [error])
 
   return (
-    <div className="mx-auto mt-24 max-w-md rounded-lg border border-border bg-bg p-8 text-center">
+    <div className="mx-auto mt-24 max-w-md rounded-panel border border-border bg-bg p-8 text-center">
+      <div className="mx-auto mb-4 grid h-10 w-10 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)] text-[var(--color-danger)]">
+        <Icon name="alert-triangle" size={18} />
+      </div>
       <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
         Something went off the rails
       </div>

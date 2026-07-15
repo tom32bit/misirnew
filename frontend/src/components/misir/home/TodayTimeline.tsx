@@ -26,7 +26,7 @@ export function TodayTimeline({
   if (captures.length === 0) {
     return (
       <div className="px-6 py-10 text-center text-[13px] text-fg-subtle">
-        Nothing captured yet today.
+        Nothing captured recently.
       </div>
     )
   }
@@ -45,17 +45,12 @@ export function TodayTimeline({
         const color = subspace ? getSubspaceColor(subspace) : "var(--accent)"
 
         return (
+          // The row is a mouse convenience only — the real, keyboard-reachable
+          // controls are the title button and the subspace button inside it
+          // (a row-level role="button" would illegally nest interactives).
           <div
             key={c.id}
-            role="button"
-            tabIndex={0}
             onClick={() => router.push(`/dashboard/${spaceId}/collection`)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault()
-                router.push(`/dashboard/${spaceId}/collection`)
-              }
-            }}
             className="group flex cursor-pointer items-start gap-4 border-b border-border px-[18px] py-3.5 transition-colors last:border-b-0 hover:bg-bg-muted"
           >
             {/* Timestamp */}
@@ -72,9 +67,16 @@ export function TodayTimeline({
             {/* Content */}
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-[1.4] text-fg">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/dashboard/${spaceId}/collection`)
+                  }}
+                  className="min-w-0 flex-1 truncate rounded-sm text-left text-[13px] font-medium leading-[1.4] text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+                >
                   {c.title}
-                </span>
+                </button>
                 {c.revisit && (
                   <span className="flex-none rounded bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-1.5 py-px font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-accent">
                     ×{c.revisit}

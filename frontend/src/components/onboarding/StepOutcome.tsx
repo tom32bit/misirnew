@@ -20,7 +20,7 @@ import { Icon } from "@/components/misir/primitives/Icon"
 import type { OnboardingDraft } from "./OnboardingFlow"
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-border-strong bg-bg px-4 py-3.5 text-[16px] leading-[1.5] text-fg outline-none transition-[border-color,box-shadow] placeholder:text-fg-faint focus:border-accent focus:shadow-[0_0_0_3px_rgba(255,108,60,0.14)]"
+  "w-full rounded-lg border border-border-strong bg-bg px-4 py-3.5 text-[16px] leading-[1.5] text-fg outline-none transition-[border-color,box-shadow] placeholder:text-fg-faint focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_15%,transparent)]"
 
 const TODAY = new Date()
 TODAY.setHours(0, 0, 0, 0)

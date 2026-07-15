@@ -86,7 +86,7 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
 
   if (space.isError) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-bg px-6 py-12 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-panel border border-border bg-bg px-6 py-12 text-center">
         <Icon name="alert-triangle" size={18} className="text-fg-subtle" />
         <div className="text-[14px] font-medium text-fg">Couldn&apos;t load this space</div>
         <div className="text-[13px] text-fg-muted">Check your connection and try again.</div>
@@ -125,7 +125,7 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
         />
       )}
 
-      <SectionHead title="Subspaces" />
+      <SectionHead icon="layers" title="Subspaces" />
       <SubspaceStatusList
         spaceId={spaceId}
         subspaces={subspaces.data ?? []}
@@ -153,34 +153,35 @@ export function HomeSingle({ spaceId }: { spaceId: number }) {
 function HomeSingleSkeleton() {
   return (
     <>
-      {/* MisirBrief skeleton */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-bg p-6">
-        <Skeleton className="h-2.5 w-20" />
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-5 w-1/2" />
-        <div className="mt-1 flex gap-3">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-20" />
+      {/* MisirBrief skeleton — mirrors its real borderless layout (pt-2 pb-6:
+          display headline, serif read, readiness row, chat button). */}
+      <div className="pt-2 pb-6">
+        <Skeleton className="mb-5 h-7 w-3/4" />
+        <div className="mb-4 flex max-w-[760px] flex-col gap-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
         </div>
+        <div className="mb-6 flex items-center gap-3">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="h-1 w-[148px] rounded-full" />
+          <Skeleton className="h-3 w-8" />
+        </div>
+        <Skeleton className="h-9 w-40 rounded-md" />
       </div>
-      {/* MisirAsks skeleton */}
-      <Skeleton className="h-[54px] w-full rounded-xl" />
-      {/* Subspaces skeleton */}
-      <div className="flex flex-col gap-2">
+      {/* Subspaces skeleton — same 3-col card grid as SubspaceStatusList. */}
+      <Skeleton className="h-4 w-28" />
+      <div className="grid grid-cols-3 gap-3 mobile:grid-cols-2">
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="grid overflow-hidden rounded-xl border border-border bg-bg"
-            style={{ gridTemplateColumns: "5px 1fr" }}
+            className="flex h-[150px] flex-col gap-3 rounded-panel border border-border bg-bg p-[18px]"
           >
-            <div className="bg-bg-muted" />
-            <div className="flex flex-col gap-2 p-4">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-3.5 w-1/3" />
-                <Skeleton className="ml-auto h-1.5 w-24 rounded-full" />
-              </div>
-              <Skeleton className="h-3 w-2/3" />
-              <Skeleton className="h-2.5 w-1/4" />
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-4/5" />
+            <div className="mt-auto flex items-center justify-between">
+              <Skeleton className="h-2.5 w-12" />
+              <Skeleton className="h-1.5 w-16 rounded-full" />
             </div>
           </div>
         ))}

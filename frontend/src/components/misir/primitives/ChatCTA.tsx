@@ -21,7 +21,7 @@ export function ChatCTA({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-3.5 rounded-lg border border-dashed border-border-strong bg-bg-subtle px-[18px] py-3.5",
+        "flex flex-wrap items-center gap-3.5 rounded-panel border border-dashed border-border-strong bg-bg-subtle px-[18px] py-3.5",
         className,
       )}
     >

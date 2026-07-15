@@ -3,8 +3,12 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
+import { motion } from "motion/react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useUser, useClerk } from "@clerk/nextjs"
 import { toast } from "sonner"
+import { SPRING } from "@/lib/motion"
+import { undoableAction } from "@/lib/undoable"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { useSpaces, useDeleteSpace } from "@/lib/hooks/useSpaces"
 import { useUIStore } from "@/lib/stores/ui-store"
@@ -27,6 +31,22 @@ const VIEWS = [
   { id: "decision", label: "Decision tree", icon: "git-branch", countKey: null },
 ] as const
 
+/**
+ * Shared-layout highlight behind the active sidebar item. One `layoutId`
+ * across nav views AND spaces, so the pill glides to wherever you navigate
+ * (Linear-style). Content spans need `relative` to paint above it.
+ */
+function ActivePill() {
+  return (
+    <motion.span
+      layoutId="sidebar-active"
+      transition={SPRING.snap}
+      aria-hidden
+      className="absolute inset-0 rounded-lg bg-[var(--bg-active)]"
+    />
+  )
+}
+
 export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
   const { data: spaces = initialSpaces } = useSpaces()
   const params = useParams<{ scope?: string; view?: string }>()
@@ -42,6 +62,7 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
   const { user } = useUser()
   const { signOut, openUserProfile } = useClerk()
   const deleteSpace = useDeleteSpace()
+  const qc = useQueryClient()
   const initial = user?.firstName?.[0] ?? user?.username?.[0] ?? "M"
   const displayName =
     user?.fullName ?? user?.firstName ?? user?.username ?? "Member"
@@ -49,25 +70,32 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
   const closeDrawer = () => setMobileOpen(false)
 
   const handleSearch = () => {
-    toast.message("⌘K is coming soon", {
-      description: "Command palette search will be available shortly.",
-    })
+    openModal({ kind: "command" })
   }
 
+  // Optimistic + undoable (house destructive pattern): the space leaves the
+  // sidebar instantly, a toast offers Undo, and the API delete only fires
+  // once the toast closes un-undone. Replaces the old window.confirm.
   const handleDeleteSpace = (s: Space) => {
-    if (!window.confirm(`Delete "${s.name}"? This cannot be undone.`)) return
-    deleteSpace.mutate(s.id, {
-      onSuccess: () => {
-        toast.success(`"${s.name}" deleted`, {
-          description: "All associated data has been removed.",
-        })
-        if (String(scope) === String(s.id)) {
-          router.push(`/dashboard/all/${view}`)
-        }
-      },
-      onError: () => toast.error("Delete failed", {
-        description: "Try again or reload the page.",
-      }),
+    qc.setQueryData<Space[]>(["spaces"], (old) =>
+      old?.filter((x) => x.id !== s.id),
+    )
+    if (String(scope) === String(s.id)) {
+      router.push(`/dashboard/all/${view}`)
+    }
+    undoableAction({
+      message: `"${s.name}" deleted`,
+      description: "All captures and reports in it will be removed.",
+      onUndo: () => qc.invalidateQueries({ queryKey: ["spaces"] }),
+      onCommit: () =>
+        deleteSpace.mutate(s.id, {
+          onError: () => {
+            toast.error("Delete failed", {
+              description: `"${s.name}" was restored.`,
+            })
+            qc.invalidateQueries({ queryKey: ["spaces"] })
+          },
+        }),
     })
   }
 
@@ -123,22 +151,25 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
               href={href}
               onClick={closeDrawer}
               className={[
-                "flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
+                "relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
                 active
-                  ? "bg-[var(--bg-active)] font-medium text-fg"
+                  ? "font-medium text-fg"
                   : "text-fg-muted hover:bg-[var(--bg-hover)] hover:text-fg",
               ].join(" ")}
             >
+              {active && <ActivePill />}
               <span
                 className={
-                  active ? "inline-flex text-accent" : "inline-flex text-fg-subtle"
+                  active
+                    ? "relative inline-flex text-accent"
+                    : "relative inline-flex text-fg-subtle"
                 }
               >
                 <Icon name={v.icon} size={14} />
               </span>
-              <span className="flex-1">{v.label}</span>
+              <span className="relative flex-1">{v.label}</span>
               {count > 0 && (
-                <span className="font-sans text-[10.5px] tabular-nums text-accent">
+                <span className="relative font-sans text-[10.5px] tabular-nums text-accent">
                   {count}
                 </span>
               )}
@@ -172,16 +203,17 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
                 href={`/dashboard/${s.id}/overview`}
                 onClick={closeDrawer}
                 className={[
-                  "flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
+                  "relative flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
                   active
-                    ? "bg-[var(--bg-active)] font-medium text-fg"
+                    ? "font-medium text-fg"
                     : "text-fg-muted hover:bg-[var(--bg-hover)] hover:text-fg",
                 ].join(" ")}
               >
-                <span className="inline-flex shrink-0" style={{ color }}>
+                {active && <ActivePill />}
+                <span className="relative inline-flex shrink-0" style={{ color }}>
                   <Icon name="target" size={14} />
                 </span>
-                <span className="truncate font-serif">{s.name}</span>
+                <span className="relative truncate font-serif">{s.name}</span>
               </Link>
               <button
                 type="button"

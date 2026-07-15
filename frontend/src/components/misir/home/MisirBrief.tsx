@@ -1,6 +1,9 @@
 "use client"
 
 import { Icon } from "@/components/misir/primitives/Icon"
+import { Button } from "@/components/misir/primitives/Button"
+import { ProgressBar } from "@/components/misir/primitives/Card"
+import { CountUp } from "@/components/misir/primitives/CountUp"
 import { stripInlineMarkdown } from "@/lib/utils"
 import type { Deadline, MisirsRead, Space } from "@/lib/api/types"
 
@@ -69,13 +72,10 @@ export function MisirBrief({
           <span className="font-mono text-[10px] uppercase tracking-[0.11em] text-fg-subtle">
             Readiness
           </span>
-          <span className="h-1 w-[148px] overflow-hidden rounded-full bg-[var(--border-strong)]">
-            <span
-              className="block h-full rounded-full transition-[width] duration-300"
-              style={{ width: `${readiness}%`, background: color }}
-            />
+          <ProgressBar value={readiness} color={color} className="h-1 w-[148px] rounded-full" />
+          <span className="text-[13px] tabular-nums text-fg-muted">
+            <CountUp value={readiness} suffix="%" />
           </span>
-          <span className="text-[13px] tabular-nums text-fg-muted">{readiness}%</span>
         </div>
         {deadline && (
           <div className="flex items-center gap-3">
@@ -91,14 +91,10 @@ export function MisirBrief({
       </div>
 
       {onChat && (
-        <button
-          type="button"
-          onClick={onChat}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-4 py-2 text-[13px] font-medium text-white shadow-[0_6px_18px_-8px_rgba(176,95,59,0.7)] transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-        >
+        <Button variant="primary" onClick={onChat}>
           Chat with Misir
           <Icon name="arrow-right" size={12} />
-        </button>
+        </Button>
       )}
     </div>
   )

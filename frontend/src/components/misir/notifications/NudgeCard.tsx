@@ -1,9 +1,11 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { Button } from "@/components/misir/primitives/Button"
 import { useDismissNudge } from "@/lib/hooks/useNudges"
+import { undoableAction } from "@/lib/undoable"
 import { useUIStore } from "@/lib/stores/ui-store"
 import type { Nudge, Space } from "@/lib/api/types"
 import { getSpaceColor } from "@/lib/constants/space-colors"
@@ -23,6 +25,7 @@ export function NudgeCard({
   const router = useRouter()
   const dismissed = useUIStore((s) => s.nudgesDismissed)
   const dismissLocal = useUIStore((s) => s.dismissNudge)
+  const restoreLocal = useUIStore((s) => s.restoreNudge)
   const dismissRemote = useDismissNudge()
 
   if (dismissed.has(nudge.id)) return null
@@ -38,16 +41,32 @@ export function NudgeCard({
     router.push(targetHref)
   }
 
+  // Optimistic + undoable: the card hides instantly, the remote dismiss only
+  // fires once the toast closes un-undone.
   const handleDismiss = () => {
     dismissLocal(nudge.id)
-    dismissRemote.mutate({ id: nudge.id, status: "dismissed" })
+    undoableAction({
+      message: "Nudge dismissed",
+      description: nudge.direction,
+      onUndo: () => restoreLocal(nudge.id),
+      onCommit: () =>
+        dismissRemote.mutate(
+          { id: nudge.id, status: "dismissed" },
+          {
+            onError: () => {
+              restoreLocal(nudge.id)
+              toast.error("Couldn't dismiss", { description: "The nudge was restored." })
+            },
+          },
+        ),
+    })
   }
 
   return (
     <div
       role="region"
       aria-label="Misir noticed"
-      className="relative grid items-center gap-[18px] rounded-lg border bg-[color-mix(in_srgb,var(--sc,var(--accent))_4%,var(--bg))] py-3.5 pl-[22px] pr-[18px] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:rounded-l-lg before:bg-[var(--sc,var(--accent))] mobile:grid-cols-1"
+      className="relative grid items-center gap-[18px] rounded-panel border bg-[color-mix(in_srgb,var(--sc,var(--accent))_4%,var(--bg))] py-3.5 pl-[22px] pr-[18px] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:rounded-l-panel before:bg-[var(--sc,var(--accent))] mobile:grid-cols-1"
       style={{
         gridTemplateColumns: "1fr auto",
         ["--sc" as string]: color,

@@ -1,10 +1,26 @@
-import type { CSSProperties } from "react"
+"use client"
+
+import { useEffect } from "react"
+import {
+  animate,
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "motion/react"
 import { cn } from "@/lib/utils"
+import { SPRING } from "@/lib/motion"
 
 /**
- * Pure-CSS conic-gradient progress ring used across Home (single + all),
- * Decision, and the space cards. Renders an outer ring + inner circle (the
- * "donut hole") + centered percentage text.
+ * Conic-gradient progress ring used across Home (single + all), Decision,
+ * and the space cards. Renders an outer ring + inner circle (the "donut
+ * hole") + centered percentage text.
+ *
+ * The arc sweeps from 0 to its value on mount (and glides when the value
+ * changes, e.g. after a refetch); the percentage rolls in sync. Both write
+ * through motion values — no React re-renders per frame. Reduced-motion
+ * users get the final value immediately.
  *
  * The design uses three sizes:
  *   - 96px: Home-single mini readiness, Decision hero compact
@@ -34,36 +50,44 @@ export function ReadinessRing({
   className?: string
 }) {
   const pct = Math.max(0, Math.min(100, value))
-  const deg = pct * 3.6
-  const computedFontSize =
-    fontSize ?? Math.max(10, Math.round(size * 0.22))
+  const reduceMotion = useReducedMotion()
+  const deg = useMotionValue(reduceMotion ? pct * 3.6 : 0)
 
-  const style: CSSProperties = {
-    width: size,
-    height: size,
-    background: `conic-gradient(${color} 0 ${deg}deg, ${trackColor} ${deg}deg 360deg)`,
-  }
-  const innerStyle: CSSProperties = {
-    inset: thickness,
-    background: "var(--bg)",
-  }
+  useEffect(() => {
+    if (reduceMotion) {
+      deg.set(pct * 3.6)
+      return
+    }
+    const controls = animate(deg, pct * 3.6, SPRING.sweep)
+    return () => controls.stop()
+  }, [pct, reduceMotion, deg])
+
+  const background = useMotionTemplate`conic-gradient(${color} 0 ${deg}deg, ${trackColor} ${deg}deg 360deg)`
+  const shownPct = useTransform(deg, (d) => String(Math.round(d / 3.6)))
+
+  const computedFontSize = fontSize ?? Math.max(10, Math.round(size * 0.22))
 
   return (
-    <div
+    <motion.div
       className={cn("relative flex-none rounded-full", className)}
-      style={style}
+      style={{ width: size, height: size, background }}
       role="img"
       aria-label={label ?? `${pct}% readiness`}
     >
-      <div className="absolute rounded-full" style={innerStyle} />
+      <div
+        className="absolute rounded-full"
+        style={{ inset: thickness, background: "var(--bg)" }}
+      />
       {showPercent && (
         <div
           className="absolute inset-0 grid place-items-center font-display font-semibold tracking-[-0.01em] text-fg"
           style={{ fontSize: computedFontSize }}
         >
-          {pct}%
+          <span>
+            <motion.span>{shownPct}</motion.span>%
+          </span>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

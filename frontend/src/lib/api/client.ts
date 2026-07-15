@@ -3,8 +3,9 @@
 import ky from "ky"
 import { useAuth } from "@clerk/nextjs"
 import { useMemo } from "react"
+import { API_URL } from "@/lib/env"
 
-const BASE = process.env.NEXT_PUBLIC_API_URL!
+const BASE = API_URL
 
 /**
  * Client-side ky instance. Calls `getToken()` from Clerk on every request

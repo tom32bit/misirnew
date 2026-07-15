@@ -13,6 +13,7 @@ import { useAuth } from "@clerk/nextjs"
 import { useUIStore } from "@/lib/stores/ui-store"
 import { useApi } from "@/lib/api/client"
 import { chatApi, streamChatMessage } from "@/lib/api/chat"
+import { API_URL } from "@/lib/env"
 import { GENERIC_FALLBACK, type MisirQuestion } from "@/lib/constants/misir-questions"
 
 export function useMisirAnswer(spaceId: number, question: MisirQuestion | null) {
@@ -30,7 +31,7 @@ export function useMisirAnswer(spaceId: number, question: MisirQuestion | null) 
       try {
         const conv = await chatApi.createConversation(k, { space_id: spaceId })
         const token = await getToken()
-        const base = process.env.NEXT_PUBLIC_API_URL!
+        const base = API_URL
 
         let acc = ""
         let any = false
