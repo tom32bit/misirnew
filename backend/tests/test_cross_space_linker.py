@@ -15,9 +15,10 @@ def _upserts(db):
 
 
 def _db_for(artifact_vec, gaps, user_space_ids):
-    """FakeDB wired for find_links: artifact (single→dict), gap + space (lists)."""
+    """FakeDB wired for find_links. All responses are LISTS of rows — the code
+    uses .limit(1) + data[0] (not .single(), which raises APIError on 0 rows)."""
     return FakeDB(responses={
-        "artifact": FakeResp(data={"content_embedding": artifact_vec}),
+        "artifact": FakeResp(data=[{"content_embedding": artifact_vec}]),
         "gap": FakeResp(data=gaps),
         "space": FakeResp(data=[{"id": i} for i in user_space_ids]),
     })
@@ -93,7 +94,7 @@ async def test_gap_in_a_space_the_user_does_not_own_is_never_linked(linker):
 
 
 async def test_artifact_without_an_embedding_is_a_no_op(linker):
-    db = FakeDB(responses={"artifact": FakeResp(data={"content_embedding": None})})
+    db = FakeDB(responses={"artifact": FakeResp(data=[{"content_embedding": None}])})
     await linker(db).find_links(artifact_id=1, user_id="uid", artifact_space_id=1)
     assert _upserts(db) == []
 
