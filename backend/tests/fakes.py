@@ -20,6 +20,10 @@ class _Builder:
         self._db = db
 
     def __getattr__(self, name):
+        # supabase exposes negation as a property that returns the builder, so
+        # `.not_.is_(col, "null")` chains through it — return self, not a method.
+        if name == "not_":
+            return self
         # Any builder method (select/eq/in_/upsert/insert/update/delete/single/...)
         def method(*args, **kwargs):
             self._db.calls.append((self._table, name, args, kwargs))
