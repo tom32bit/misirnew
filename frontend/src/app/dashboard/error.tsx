@@ -14,7 +14,7 @@ export default function DashboardError({
 }) {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
+       
       console.error("[dashboard error]", error)
     }
   }, [error])

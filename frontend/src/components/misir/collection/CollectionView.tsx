@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -140,50 +140,43 @@ export function CollectionView({ scope }: { scope: Scope }) {
     })
   }
 
-  const captures = useMemo(
-    () => adaptCaptures(artifacts.data ?? [], new Date(), subspaces.data ?? []),
-    [artifacts.data, subspaces.data],
-  )
+  // Computed inline — React Compiler memoizes these itself; the previous
+  // manual useMemo chain tripped react-hooks/preserve-manual-memoization
+  // (the compiler couldn't reproduce it, so compilation was skipped).
+  // `now` is mount-stable so the derivation stays pure.
+  const [now] = useState(() => new Date())
+  const captures = adaptCaptures(artifacts.data ?? [], now, subspaces.data ?? [])
 
   // Counts per type (over the unfiltered fetched set so the segment labels
   // don't shrink to 0 as the user clicks).
-  const typeCounts: Record<TypeKey, number> = useMemo(() => {
-    const c: Record<TypeKey, number> = {
-      all: captures.length,
-      article: 0,
-      aichat: 0,
-      pdf: 0,
-      video: 0,
-      post: 0,
-    }
-    for (const cap of captures) c[classifyCapture(cap)]++
-    return c
-  }, [captures])
+  const typeCounts: Record<TypeKey, number> = {
+    all: captures.length,
+    article: 0,
+    aichat: 0,
+    pdf: 0,
+    video: 0,
+    post: 0,
+  }
+  for (const cap of captures) typeCounts[classifyCapture(cap)]++
 
-  const filtered = useMemo(
-    () =>
-      captures
-        .filter((c) =>
-          typeFilter === "all" ? true : classifyCapture(c) === typeFilter,
-        )
-        .filter((c) =>
-          subFilter === "all"
-            ? true
-            : String(c.subspaceId ?? "—") === subFilter,
-        ),
-    [captures, typeFilter, subFilter],
-  )
+  const filtered = captures
+    .filter((c) =>
+      typeFilter === "all" ? true : classifyCapture(c) === typeFilter,
+    )
+    .filter((c) =>
+      subFilter === "all"
+        ? true
+        : String(c.subspaceId ?? "—") === subFilter,
+    )
 
   // Group by date label ("Today", "Yesterday", "2d ago", "Aug 14"…)
-  const groups: Array<[string, CaptureVM[]]> = useMemo(() => {
-    const map = new Map<string, CaptureVM[]>()
-    for (const c of filtered) {
-      const list = map.get(c.date) ?? []
-      list.push(c)
-      map.set(c.date, list)
-    }
-    return Array.from(map.entries())
-  }, [filtered])
+  const groupMap = new Map<string, CaptureVM[]>()
+  for (const c of filtered) {
+    const list = groupMap.get(c.date) ?? []
+    list.push(c)
+    groupMap.set(c.date, list)
+  }
+  const groups: Array<[string, CaptureVM[]]> = Array.from(groupMap.entries())
 
   const segOpts: SegmentOption<TypeKey>[] = (Object.keys(TYPE_LABEL) as TypeKey[]).map(
     (k) => ({ value: k, label: TYPE_LABEL[k], count: typeCounts[k] }),

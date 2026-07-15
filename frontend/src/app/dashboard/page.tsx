@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { serverApi } from "@/lib/api/server"
 import { spacesApi } from "@/lib/api/spaces"
@@ -19,12 +20,12 @@ export default async function DashboardIndex() {
         <p className="max-w-sm text-[13px] text-fg-muted">
           Misir can&apos;t reach its API right now. Start the backend server, then refresh.
         </p>
-        <a
+        <Link
           href="/dashboard"
           className="mt-2 rounded-lg border border-border-strong bg-bg px-4 py-2 text-[13px] text-fg-muted transition-colors hover:bg-bg-muted hover:text-fg"
         >
           Retry
-        </a>
+        </Link>
       </div>
     )
   }

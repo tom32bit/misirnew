@@ -38,9 +38,12 @@ export function useGlobalShortcuts() {
   const [, toggleTheme] = useTheme()
 
   // Refs so the single document listener always sees current state without
-  // re-subscribing on every render.
+  // re-subscribing on every render. Synced in an effect — writing a ref
+  // during render violates the rules of React.
   const modalRef = useRef(modal)
-  modalRef.current = modal
+  useEffect(() => {
+    modalRef.current = modal
+  }, [modal])
   const pendingG = useRef<number | null>(null)
 
   useEffect(() => {

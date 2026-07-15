@@ -48,10 +48,10 @@ export function MisirAsks({
       <Card style={baseStyle}>
         <Header subspaceName={submittedTitle} prefix="Misir asked" />
         <div className="py-0 pl-[22px] pr-[18px] font-display text-[20px] font-semibold leading-[1.4] tracking-[-0.015em] text-fg [text-wrap:pretty]">
-          "{q.question}"
+          &ldquo;{q.question}&rdquo;
         </div>
         <div className="px-[22px] pt-1 text-[13.5px] italic text-fg-muted">
-          "{ask.submitted}"
+          &ldquo;{ask.submitted}&rdquo;
         </div>
         <div className="flex items-center gap-2.5 px-[22px] py-4 text-[13px] text-fg-muted">
           <TypingDots />
@@ -72,7 +72,7 @@ export function MisirAsks({
               You said
             </span>
             <p className="m-0 rounded-md bg-bg-muted px-3.5 py-2.5 font-serif text-[13.5px] italic leading-[1.55] text-fg">
-              "{ask.submitted}"
+              &ldquo;{ask.submitted}&rdquo;
             </p>
           </div>
           <div className="flex flex-col gap-1.5">

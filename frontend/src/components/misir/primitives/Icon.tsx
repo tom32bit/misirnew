@@ -28,7 +28,7 @@ export function Icon({
   const Cmp = Icons[key] as React.ComponentType<LucideProps> | undefined
   if (!Cmp) {
     if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
+       
       console.warn(`[Icon] unknown lucide icon: ${name}`)
     }
     return null
