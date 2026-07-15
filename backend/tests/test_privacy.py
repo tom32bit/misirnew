@@ -40,9 +40,13 @@ def test_export_omits_embeddings_includes_tags_and_sessions():
     db = FakeDB()
     out = account_service.export_user_data(db, "uid")
     assert {"artifacts", "artifact_tags", "sessions", "consents"} <= set(out)
-    art_select = next(args[0] for (t, m, args, kw) in db.calls if t == "artifact" and m == "select")
-    assert "content_embedding" not in art_select       # embeddings excluded
-    assert "extracted_text" in art_select
+    # The export runs several artifact selects (an ids-only pagination query
+    # plus the data query) — NONE may include the embedding, and the data
+    # query must include the extracted text.
+    art_selects = [args[0] for (t, m, args, kw) in db.calls if t == "artifact" and m == "select"]
+    assert art_selects
+    assert all("content_embedding" not in s for s in art_selects)  # embeddings excluded
+    assert any("extracted_text" in s for s in art_selects)
 
 
 def test_retention_purge_counts():

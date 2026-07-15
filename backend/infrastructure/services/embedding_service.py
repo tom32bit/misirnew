@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Optional
 
 import numpy as np
@@ -24,6 +24,40 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 DIM = 768
+
+
+class _VectorCache:
+    """Bounded LRU keyed by (task_type, md5(text)) — NOT the text itself.
+
+    The previous @lru_cache stored the full prefixed text as the key; with
+    captures up to 200k chars and maxsize=10000 that was a multi-GB worst
+    case. Hash keys make the cache size vector-dominated (~60 MB at 10k
+    768-dim entries)."""
+
+    def __init__(self, maxsize: int = 10000) -> None:
+        self._data: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
+        self._maxsize = maxsize
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _key(task_type: str, text: str) -> tuple[str, str]:
+        return (task_type, hashlib.md5(text.encode()).hexdigest())
+
+    def get(self, task_type: str, text: str) -> Optional[list[float]]:
+        key = self._key(task_type, text)
+        with self._lock:
+            vec = self._data.get(key)
+            if vec is not None:
+                self._data.move_to_end(key)
+            return vec
+
+    def put(self, task_type: str, text: str, vector: list[float]) -> None:
+        key = self._key(task_type, text)
+        with self._lock:
+            self._data[key] = vector
+            self._data.move_to_end(key)
+            if len(self._data) > self._maxsize:
+                self._data.popitem(last=False)
 
 
 @dataclass(frozen=True)
@@ -51,6 +85,7 @@ class EmbeddingService:
         self._model_lock = threading.Lock()
         self._model_instance = None
         self._loaded = False
+        self._cache = _VectorCache()
         if self._provider == "nomic" and not api_key:
             logger.warning("EMBEDDING_PROVIDER=nomic but NOMIC_API_KEY is empty — embeds will fail")
 
@@ -75,9 +110,22 @@ class EmbeddingService:
     def _model(self):
         return self._load_model()
 
-    @lru_cache(maxsize=10000)
-    def _cached_encode_local(self, prefixed_text: str) -> np.ndarray:
-        return self._model.encode(prefixed_text, normalize_embeddings=True, show_progress_bar=False)
+    def warm_up(self) -> None:
+        """Load the local torch model into memory ahead of the first embed.
+
+        No-op for remote providers. Safe to call from a worker thread; a
+        concurrent first embed just waits on the same model lock.
+        """
+        if self._provider == "local":
+            self._load_model()
+
+    def _cached_encode_local(self, prefixed_text: str) -> list[float]:
+        cached = self._cache.get("local", prefixed_text)
+        if cached is not None:
+            return cached
+        vec = self._model.encode(prefixed_text, normalize_embeddings=True, show_progress_bar=False).tolist()
+        self._cache.put("local", prefixed_text, vec)
+        return vec
 
     # ── Remote (Nomic hosted API) ───────────────────────────────────────────────
     def _remote_model_id(self) -> str:
@@ -103,9 +151,13 @@ class EmbeddingService:
             out.append(vec.tolist())
         return out
 
-    @lru_cache(maxsize=10000)
-    def _cached_encode_remote(self, text: str, task_type: str) -> tuple:
-        return tuple(self._remote_encode([text], task_type)[0])
+    def _cached_encode_remote(self, text: str, task_type: str) -> list[float]:
+        cached = self._cache.get(task_type, text)
+        if cached is not None:
+            return cached
+        vec = self._remote_encode([text], task_type)[0]
+        self._cache.put(task_type, text, vec)
+        return vec
 
     # ── Public API (provider-agnostic) ──────────────────────────────────────────
     def _hash(self, text: str) -> str:
@@ -113,9 +165,9 @@ class EmbeddingService:
 
     def _embed_one(self, text: str, task_type: str) -> list[float]:
         if self._provider == "nomic":
-            return list(self._cached_encode_remote(text, task_type))
+            return self._cached_encode_remote(text, task_type)
         prefix = "search_query: " if task_type == "search_query" else "search_document: "
-        return self._cached_encode_local(f"{prefix}{text}").tolist()
+        return self._cached_encode_local(f"{prefix}{text}")
 
     def embed_text(self, text: str) -> EmbeddingResult:
         return EmbeddingResult(

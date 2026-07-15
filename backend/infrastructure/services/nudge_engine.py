@@ -164,13 +164,16 @@ async def run_nudge_rules(user_id: str, space_id: int, db, space_name: str = "",
         .limit(2)
     )
     for link in (stale_links.data or []):
-        gap = await aexec(db.schema("misir").table("gap").select("label, space_id").eq("id", link["target_gap_id"]).single())
-        art = await aexec(db.schema("misir").table("artifact").select("title").eq("id", link["source_artifact_id"]).single())
+        # No .single() — the gap/artifact may have been deleted; supabase-py
+        # raises APIError on 0 rows and would abort the whole nudge refresh.
+        gap = await aexec(db.schema("misir").table("gap").select("label, space_id").eq("id", link["target_gap_id"]).limit(1))
+        art = await aexec(db.schema("misir").table("artifact").select("title").eq("id", link["source_artifact_id"]).limit(1))
         if not gap.data or not art.data:
             continue
-        evidence = f"Your artifact \"{art.data.get('title')}\" has a strong connection to the gap \"{gap.data['label']}\" in your {space_name} research, but you haven't acted on it in 3+ days."
+        gap_row, art_row = gap.data[0], art.data[0]
+        evidence = f"Your artifact \"{art_row.get('title')}\" has a strong connection to the gap \"{gap_row['label']}\" in your {space_name} research, but you haven't acted on it in 3+ days."
         phrased = await _kw(evidence, {
-            "scatter": f"You've ignored a direct connection between \"{art.data.get('title')}\" and your open gap for 3 days.",
+            "scatter": f"You've ignored a direct connection between \"{art_row.get('title')}\" and your open gap for 3 days.",
             "direction": "Apply what that artifact says directly to closing the gap — one focused write-up.",
             "consequence": f"That connection is the shortest path to resolving a gap in your {space_name} research.",
         })
@@ -249,8 +252,9 @@ async def refresh_nudges_for_space(user_id: str, space_id: int, force: bool = Fa
             if (now - last) < timedelta(minutes=cooldown):
                 return
 
-    space_row = await aexec(db.schema("misir").table("space").select("name, goal").eq("id", space_id).single())
-    space = space_row.data or {}
+    # No .single() — supabase-py raises APIError on 0 rows (just-deleted space).
+    space_row = await aexec(db.schema("misir").table("space").select("name, goal").eq("id", space_id).limit(1))
+    space = space_row.data[0] if space_row.data else {}
     space_name = space.get("name", "")
     space_goal = space.get("goal", "")
 

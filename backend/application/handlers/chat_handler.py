@@ -16,22 +16,33 @@ from infrastructure.services.supabase_client import get_supabase
 logger = get_logger(__name__)
 settings = get_settings()
 
+class ChatStreamError(Exception):
+    """Raised when the chat stream cannot run/complete. The message is
+    USER-SAFE — it is sent to the client verbatim in an SSE error frame;
+    internal details must go to the log only."""
+
+
 CHAT_SYSTEM = """\
 You are Misir — a research intelligence assistant for founders.
 You have deep context about the user's research: their spaces, artifacts, gaps, and goals.
 Speak directly. No hedging. Reference specific evidence from the context.
-When you cite something, be specific (artifact title, gap label, platform).
-Do not reveal that you are an AI or that you have limitations."""
+When you cite something, be specific (artifact title, gap label, platform)."""
 
 
 async def _build_context(user_id: str, space_id: Optional[int], db) -> str:
     parts = []
 
-    # Spaces overview
+    # Spaces overview. Only claim an "Active space" when the conversation is
+    # actually attached to one — presenting the user's first space as active in
+    # a general chat fed the LLM misleading context.
     spaces = await aexec(db.schema("misir").table("space").select("id, name, goal").eq("user_id", user_id))
     if spaces.data:
-        active_space = next((s for s in spaces.data if s["id"] == space_id), spaces.data[0]) if space_id else spaces.data[0]
-        parts.append(f"Active space: \"{active_space['name']}\" — goal: {active_space.get('goal') or 'not set'}")
+        active_space = next((s for s in spaces.data if s["id"] == space_id), None) if space_id else None
+        if active_space:
+            parts.append(f"Active space: \"{active_space['name']}\" — goal: {active_space.get('goal') or 'not set'}")
+        else:
+            names = ", ".join(f"\"{s['name']}\"" for s in spaces.data[:10])
+            parts.append(f"General chat (no active space). The user's spaces: {names}")
 
     if space_id:
         # Recent artifacts
@@ -55,14 +66,43 @@ async def _build_context(user_id: str, space_id: Optional[int], db) -> str:
         if gaps.data:
             parts.append("Open gaps:\n" + "\n".join(f"- [{g['severity']}] {g['label']}" for g in gaps.data))
 
-        # Deadline
-        dl = await aexec(db.schema("misir").table("deadline").select("label, due_at").eq("space_id", space_id).eq("user_id", user_id))
+        # Deadline — nearest first (deterministic if several exist), and say
+        # OVERDUE instead of emitting a negative day count.
+        dl = await aexec(
+            db.schema("misir").table("deadline").select("label, due_at")
+            .eq("space_id", space_id).eq("user_id", user_id)
+            .order("due_at").limit(1)
+        )
         if dl.data:
             due = datetime.fromisoformat(dl.data[0]["due_at"].replace("Z", "+00:00"))
             days = (due - datetime.now(timezone.utc)).days
-            parts.append(f"Upcoming deadline: {days} days to {dl.data[0]['label']}")
+            if days >= 0:
+                parts.append(f"Upcoming deadline: {days} days to {dl.data[0]['label']}")
+            else:
+                parts.append(f"Deadline OVERDUE by {-days} days: {dl.data[0]['label']}")
 
     return "\n\n".join(parts)
+
+
+def _prepare_history(rows_newest_first: list[dict], user_message: str) -> list[dict]:
+    """Newest-first DB rows → chronological LLM messages, guaranteed to end
+    with the current user message exactly once.
+
+    The route persists the incoming user message BEFORE streaming, so history
+    normally already ends with it — appending unconditionally would send it to
+    the LLM twice. It's only appended when genuinely missing (e.g. the insert
+    failed)."""
+    messages = [
+        {"role": "user" if m["role"] == "user" else "assistant", "content": m["content"]}
+        for m in reversed(rows_newest_first or [])
+    ]
+    if not (
+        messages
+        and messages[-1]["role"] == "user"
+        and messages[-1]["content"] == user_message
+    ):
+        messages.append({"role": "user", "content": user_message})
+    return messages
 
 
 async def stream_chat_response(
@@ -78,29 +118,24 @@ async def stream_chat_response(
     # Build context
     context = await _build_context(user_id, space_id, db)
 
-    # Fetch history
+    # Fetch the MOST RECENT history: descending + limit, then reverse back to
+    # chronological. Ascending + limit would return the oldest N messages and
+    # silently drop all recent turns once a conversation outgrows the limit.
     history = await aexec(
         db.schema("misir")
         .table("chat_message")
         .select("role, content")
         .eq("conversation_id", conversation_id)
-        .order("created_at")
+        .order("created_at", desc=True)
         .limit(settings.CHAT_MAX_HISTORY_MESSAGES)
     )
-    history_messages = [
-        {"role": "user" if m["role"] == "user" else "assistant", "content": m["content"]}
-        for m in (history.data or [])
-    ]
-
     messages = [
         {"role": "system", "content": f"{CHAT_SYSTEM}\n\n--- Research Context ---\n{context}"},
-        *history_messages,
-        {"role": "user", "content": user_message},
+        *_prepare_history(history.data or [], user_message),
     ]
 
     if not groq.is_available:
-        yield "Groq is not configured. Please set GROQ_API_KEY."
-        return
+        raise ChatStreamError("Chat is not configured on this server.")
 
     try:
         async for chunk in groq.chat_completion_stream(
@@ -114,8 +149,12 @@ async def stream_chat_response(
             if delta and delta.content:
                 yield delta.content
     except Exception as exc:
+        # Log the real error server-side; send only a user-safe message. The
+        # route turns this into a `data: {"error": ...}` SSE frame — yielding
+        # the text here would persist it as assistant content and never trigger
+        # the frontend's error/retry UI.
         logger.error("Chat stream failed", conversation_id=conversation_id, error=str(exc))
-        yield f"\n\n[Error: {exc}]"
+        raise ChatStreamError("Misir couldn't finish that reply. Try again.") from exc
 
 
 async def auto_title(user_message: str, assistant_response: str) -> str:

@@ -18,7 +18,7 @@ import hmac
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from auth.clerk import CurrentUser, delete_clerk_user, get_current_user
@@ -27,7 +27,7 @@ from core.limiter import limiter
 from infrastructure.services import account_service, consent_service, retention_service
 from infrastructure.services.audit_service import record_audit
 from infrastructure.services.supabase_client import get_supabase
-from interfaces.api.spaces import _resolve_user_id
+from interfaces.api.spaces import _resolve_user_id, invalidate_resolved_user
 
 router = APIRouter(tags=["privacy"])
 _settings = get_settings()
@@ -84,16 +84,20 @@ def update_consent(body: ConsentUpdate, current_user: CurrentUser = Depends(get_
 def export_me(request: Request, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id, current_user.email)
-    data = account_service.export_user_data(db, user_id)
-    record_audit(user_id, "account.export", {"tables": list(data.keys())})
-    payload = {
-        "exported_at_utc": None,  # stamped by client; server clock omitted intentionally
-        "user": {"id": user_id, "clerk_user_id": current_user.clerk_user_id, "email": current_user.email},
-        "policy_version": _settings.PRIVACY_POLICY_VERSION,
-        "data": data,
-    }
-    return JSONResponse(
-        content=payload,
+    record_audit(user_id, "account.export", {"tables": account_service.EXPORT_SECTIONS})
+    # STREAMED response: artifacts carry up to 200k chars each, so building the
+    # whole export in memory risked OOM/proxy timeouts on large accounts. Rows
+    # are serialised as they're fetched (paginated), keeping peak memory flat.
+    # exported_at_utc is null by design — stamped by the client, server clock
+    # omitted intentionally.
+    stream = account_service.stream_export_json(
+        db, user_id,
+        user_meta={"id": user_id, "clerk_user_id": current_user.clerk_user_id, "email": current_user.email},
+        policy_version=_settings.PRIVACY_POLICY_VERSION,
+    )
+    return StreamingResponse(
+        stream,
+        media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="misir-data-export.json"'},
     )
 
@@ -108,6 +112,9 @@ async def delete_me(request: Request, current_user: CurrentUser = Depends(get_cu
     # Audit BEFORE deletion (the row's user_id is nulled afterwards).
     record_audit(user_id, "account.delete", {"clerk_user_id": current_user.clerk_user_id})
     account_service.delete_user_account(db, user_id)
+    # Drop the cached clerk→uuid mapping so a later re-signup with the same
+    # Clerk id provisions a fresh row instead of resolving to the dead uuid.
+    invalidate_resolved_user(current_user.clerk_user_id)
     # Fan-out erasure to the Clerk identity (GDPR Art 17). Best-effort: if
     # CLERK_SECRET_KEY is unset or the call fails, flag for manual ops follow-up.
     clerk_deleted = await delete_clerk_user(current_user.clerk_user_id)

@@ -29,7 +29,11 @@ class Settings(BaseSettings):
     # skipped and flagged in the audit log for manual ops follow-up.
     CLERK_SECRET_KEY: str = ""
 
-    # CORS — frontend origin(s) + extension
+    # CORS — browser origins allowed to call the API from a page context.
+    # Defaults cover LOCAL DEV ONLY: production MUST set CORS_ORIGINS to the
+    # deployed frontend origin(s) or the web app cannot reach the API.
+    # The extension does NOT need an entry here — its service worker fetches
+    # with host_permissions, which bypasses CORS entirely.
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

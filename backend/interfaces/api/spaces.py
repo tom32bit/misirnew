@@ -31,12 +31,33 @@ class SpaceUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=4000)
 
 
+# clerk_user_id → (internal uuid, expiry). The mapping is immutable for a
+# user's lifetime, and _resolve_user_id runs on EVERY authenticated request —
+# without this cache that's 1–2 extra DB round trips per call. TTL-bounded and
+# explicitly invalidated on account deletion (see interfaces/api/privacy.py),
+# so a deleted-and-recreated account can't resolve to the dead uuid.
+_user_id_cache: dict[str, tuple[str, float]] = {}
+_USER_ID_CACHE_TTL_SECONDS = 900.0
+_USER_ID_CACHE_MAX = 10_000
+
+
+def invalidate_resolved_user(clerk_user_id: str) -> None:
+    """Drop the cached uuid for this Clerk user (call after account erasure)."""
+    _user_id_cache.pop(clerk_user_id, None)
+
+
 def _resolve_user_id(db, clerk_user_id: str, email: str = "") -> str:
     """
     Resolve internal user UUID from Clerk user ID.
     Auto-upserts the auth_user row on first call so any endpoint works
     without requiring the frontend to hit /me first.
     """
+    import time as _time
+    now = _time.monotonic()
+    hit = _user_id_cache.get(clerk_user_id)
+    if hit and hit[1] > now:
+        return hit[0]
+
     rows = (
         db.schema("misir")
         .table("auth_user")
@@ -45,7 +66,11 @@ def _resolve_user_id(db, clerk_user_id: str, email: str = "") -> str:
         .execute()
     )
     if rows.data:
-        return rows.data[0]["id"]
+        user_id = rows.data[0]["id"]
+        if len(_user_id_cache) >= _USER_ID_CACHE_MAX:
+            _user_id_cache.clear()  # crude but safe bound; refills on demand
+        _user_id_cache[clerk_user_id] = (user_id, now + _USER_ID_CACHE_TTL_SECONDS)
+        return user_id
 
     # First-time user — create the row
     upserted = (
@@ -63,6 +88,7 @@ def _resolve_user_id(db, clerk_user_id: str, email: str = "") -> str:
     db.schema("misir").table("profile").upsert(
         {"id": user_id}, on_conflict="id"
     ).execute()
+    _user_id_cache[clerk_user_id] = (user_id, now + _USER_ID_CACHE_TTL_SECONDS)
     return user_id
 
 
@@ -184,10 +210,12 @@ async def generate_space(request: Request, body: SpaceGenerate, current_user: Cu
 def get_space(space_id: int, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id)
-    row = db.schema("misir").table("space").select("*").eq("id", space_id).eq("user_id", user_id).single().execute()
+    # No .single() — supabase-py raises APIError on 0 rows, which would surface
+    # as a 500 instead of this 404.
+    row = db.schema("misir").table("space").select("*").eq("id", space_id).eq("user_id", user_id).limit(1).execute()
     if not row.data:
         raise HTTPException(status_code=404, detail="Space not found")
-    return row.data
+    return row.data[0]
 
 
 @router.patch("/spaces/{space_id}")
@@ -213,32 +241,15 @@ def delete_space(space_id: int, current_user: CurrentUser = Depends(get_current_
     if not owned.data:
         raise HTTPException(status_code=404, detail="Space not found")
 
-    # Collect IDs needed for child deletes
-    art_ids = [r["id"] for r in (db.schema("misir").table("artifact").select("id").eq("space_id", space_id).execute().data or [])]
-    sub_ids = [r["id"] for r in (db.schema("misir").table("subspace").select("id").eq("space_id", space_id).execute().data or [])]
-    gap_ids = [r["id"] for r in (db.schema("misir").table("gap").select("id").eq("space_id", space_id).execute().data or [])]
-    conv_ids = [r["id"] for r in (db.schema("misir").table("chat_conversation").select("id").eq("space_id", space_id).execute().data or [])]
-
-    # Delete in FK dependency order (children before parents)
-    if sub_ids:
-        db.schema("misir").table("subspace_marker").delete().in_("subspace_id", sub_ids).execute()
-    if art_ids:
-        db.schema("misir").table("source_synthesis").delete().in_("artifact_id", art_ids).execute()
-        db.schema("misir").table("artifact_open_event").delete().in_("artifact_id", art_ids).execute()
-        db.schema("misir").table("artifact_tag").delete().in_("artifact_id", art_ids).execute()
-        db.schema("misir").table("cross_space_link").delete().in_("source_artifact_id", art_ids).execute()
-    if gap_ids:
-        db.schema("misir").table("cross_space_link").delete().in_("target_gap_id", gap_ids).execute()
-    if conv_ids:
-        db.schema("misir").table("chat_message").delete().in_("conversation_id", conv_ids).execute()
-
-    db.schema("misir").table("artifact").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("gap").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("subspace").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("marker").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("chat_conversation").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("deadline").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("nudge").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("report").delete().eq("space_id", space_id).execute()
-    db.schema("misir").table("space_summary").delete().eq("space_id", space_id).execute()
+    # The schema's ON DELETE CASCADE FKs do the fan-out (each statement below is
+    # atomic including its children), so this is 3 statements instead of the old
+    # ~15 — a much smaller partial-failure window. Two children need explicit
+    # deletes because their space FK is ON DELETE SET NULL (they'd survive as
+    # orphans otherwise), and each cascades its own children:
+    #   artifact           → source_synthesis, open events, tags, cross-links
+    #   chat_conversation  → chat_message
+    db.schema("misir").table("artifact").delete().eq("space_id", space_id).eq("user_id", user_id).execute()
+    db.schema("misir").table("chat_conversation").delete().eq("space_id", space_id).eq("user_id", user_id).execute()
+    # Space row cascades: subspace (→ subspace_marker), marker, gap (→ its
+    # cross-links), deadline, nudge, report, space_summary.
     db.schema("misir").table("space").delete().eq("id", space_id).eq("user_id", user_id).execute()

@@ -189,8 +189,9 @@ async def run_stage_a(space_id: int, period: str, db) -> Optional[dict]:
         return cached
 
     # Fetch space metadata
-    space_row = await aexec(db.schema("misir").table("space").select("name, goal, description").eq("id", space_id).single())
-    space = space_row.data or {}
+    # No .single() — supabase-py raises APIError on 0 rows (500 on a just-deleted space).
+    space_row = await aexec(db.schema("misir").table("space").select("name, goal, description").eq("id", space_id).limit(1))
+    space = space_row.data[0] if space_row.data else {}
 
     # Fetch pre-computed source_synthesis for these artifacts
     synth_rows = await aexec(
@@ -299,12 +300,15 @@ class SynthesisService:
     async def synthesize_artifact(self, artifact_id: int, text: str, engagement: EngagementLevel) -> None:
         db = get_supabase()
         # Fetch space goal for context
-        art = db.schema("misir").table("artifact").select("space_id").eq("id", artifact_id).single().execute()
+        # No .single() — the artifact/space may have been deleted since capture;
+        # supabase-py raises APIError on 0 rows and would kill the pipeline step.
+        art = db.schema("misir").table("artifact").select("space_id").eq("id", artifact_id).limit(1).execute()
+        art_row = art.data[0] if art.data else {}
         space_context = None
-        if art.data and art.data.get("space_id"):
-            sp = db.schema("misir").table("space").select("goal").eq("id", art.data["space_id"]).single().execute()
+        if art_row.get("space_id"):
+            sp = db.schema("misir").table("space").select("goal").eq("id", art_row["space_id"]).limit(1).execute()
             if sp.data:
-                space_context = sp.data.get("goal")
+                space_context = sp.data[0].get("goal")
 
         result = await synthesize_artifact_text(artifact_id, text, space_context)
         if result:

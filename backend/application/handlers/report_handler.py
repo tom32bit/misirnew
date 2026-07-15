@@ -26,6 +26,7 @@ from infrastructure.services.db_async import aexec
 from infrastructure.services.groq_client import get_groq_client, TaskPriority
 from infrastructure.services.report_cache import (
     get_report_cache,
+    get_report_cache_any,
     set_report_cache,
 )
 from infrastructure.services.synthesis_service import run_stage_a
@@ -33,6 +34,40 @@ from infrastructure.services.supabase_client import get_supabase
 
 logger = get_logger(__name__)
 settings = get_settings()
+
+# Background re-synthesis guardrails (see get_dashboard_payload): artifact ids
+# currently being synthesized (dedupe across concurrent dashboard loads) and a
+# cap on how many Groq syntheses run at once per process.
+_bg_synthesis_inflight: set[int] = set()
+_BG_SYNTHESIS_SEM = asyncio.Semaphore(3)
+
+# Per-(user, space, kind, period) build locks so concurrent dashboard requests
+# don't each pay for the same Stage B LLM build (cache stampede).
+_report_build_locks: dict[tuple, asyncio.Lock] = {}
+
+# Spaces with a nudge refresh currently running in the background — dashboard
+# loads must not stack a second refresh behind the first.
+_nudge_refresh_inflight: set[int] = set()
+
+# Canonical per-platform display names + colours. Labels are brand-correct
+# ("ChatGPT", not str.capitalize()'s "Chatgpt") — the frontend renders these
+# verbatim, so every surface shows the same spelling.
+PLATFORM_LABELS = {
+    "web": "Web", "claude": "Claude", "chatgpt": "ChatGPT", "gemini": "Gemini",
+    "perplexity": "Perplexity", "deepseek": "DeepSeek", "grok": "Grok",
+    "copilot": "Copilot", "notebooklm": "NotebookLM", "kimi": "Kimi",
+    "youtube": "YouTube",
+}
+PLATFORM_COLORS = {
+    "claude": "#C44820", "chatgpt": "#10A37F", "gemini": "#2A6A4A",
+    "perplexity": "#6B46C1", "deepseek": "#1E40AF", "grok": "#000000",
+    "copilot": "#0078D4", "notebooklm": "#EA4335", "kimi": "#FF6B35",
+    "web": "#2A4A7A",
+}
+
+
+def _platform_label(platform: str) -> str:
+    return PLATFORM_LABELS.get(platform, platform.capitalize())
 
 
 def _local_midnight(utc_now: datetime, tz_offset_minutes: int) -> datetime:
@@ -126,6 +161,30 @@ Rules:
 - Do NOT output any percentages or numbers."""
 
 
+# ── Gap dedupe helpers ────────────────────────────────────────────────────────
+# Token-set similarity so rephrased open questions don't accumulate as
+# near-duplicate gaps run after run.
+
+_GAP_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "to", "in", "for", "on", "and", "or", "is", "are",
+    "what", "how", "does", "do", "which", "with", "there", "their", "your",
+    "this", "that", "will", "would", "should", "can", "be", "it", "its",
+})
+
+
+def _gap_tokens(label: str) -> frozenset[str]:
+    import re as _re
+    return frozenset(_re.findall(r"[a-z0-9]+", (label or "").lower())) - _GAP_STOPWORDS
+
+
+def _gap_similar(a: frozenset[str], b: frozenset[str], threshold: float = 0.6) -> bool:
+    """Jaccard similarity on content tokens — catches LLM rephrasings."""
+    if not a or not b:
+        return a == b
+    union = len(a | b)
+    return union > 0 and len(a & b) / union >= threshold
+
+
 def _extract_ai_chat_insight(extracted_text: str, max_len: int = 280) -> str:
     """Return the first meaningful Assistant turn from serialised AI-chat text.
 
@@ -158,8 +217,9 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
     Backed by Stage A + Stage B caches.
     """
     # ── Fetch context ────────────────────────────────────────────────────────
-    space_row = await aexec(db.schema("misir").table("space").select("name, goal, description").eq("id", space_id).single())
-    space = space_row.data or {}
+    # No .single() — supabase-py raises APIError on 0 rows (500 on a just-deleted space).
+    space_row = await aexec(db.schema("misir").table("space").select("name, goal, description").eq("id", space_id).limit(1))
+    space = space_row.data[0] if space_row.data else {}
 
     deadline_row = await aexec(db.schema("misir").table("deadline").select("*").eq("space_id", space_id).eq("user_id", user_id))
     deadline = deadline_row.data[0] if deadline_row.data else None
@@ -167,12 +227,24 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
     gaps_row = await aexec(db.schema("misir").table("gap").select("*").eq("space_id", space_id).neq("status", "resolved"))
     gaps = gaps_row.data or []
 
-    # Refresh nudges before reading so this response gets fresh nudges
-    try:
-        from infrastructure.services.nudge_engine import refresh_nudges_for_space
-        await refresh_nudges_for_space(user_id, space_id)
-    except Exception as exc:
-        logger.warning("Nudge refresh failed", error=str(exc))
+    # Kick a nudge refresh in the BACKGROUND (fire-and-forget, deduped per
+    # space) instead of awaiting it — the refresh fires several Groq calls and
+    # was a big chunk of first-load latency. This response serves the current
+    # active nudges; fresh ones appear on the next load. The engine's own
+    # cooldown still applies inside refresh_nudges_for_space.
+    if space_id not in _nudge_refresh_inflight:
+        _nudge_refresh_inflight.add(space_id)
+
+        async def _bg_nudge_refresh() -> None:
+            try:
+                from infrastructure.services.nudge_engine import refresh_nudges_for_space
+                await refresh_nudges_for_space(user_id, space_id)
+            except Exception as exc:
+                logger.warning("Nudge refresh failed", error=str(exc))
+            finally:
+                _nudge_refresh_inflight.discard(space_id)
+
+        asyncio.ensure_future(_bg_nudge_refresh())
 
     nudges_row = await aexec(db.schema("misir").table("nudge").select("*").eq("user_id", user_id).eq("space_id", space_id).eq("status", "active").order("priority", desc=True).limit(5))
     nudges = nudges_row.data or []
@@ -197,15 +269,22 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
     # ── Stage A (synthesis) — skipped for custom dates; synthesis is period-scoped ──
     stage_a = None if date else await run_stage_a(space_id, period, db)
 
-    # Auto-create gaps from Stage A open_questions (if not already present)
+    # Auto-create gaps from Stage A open_questions (if not already present).
+    # Dedupe is FUZZY, not exact: the LLM rephrases the same question slightly
+    # differently each run ("How big is the market?" vs "What is the market
+    # size?"), and exact-match dedupe let those pile up as near-duplicate gaps.
     if stage_a and stage_a.get("open_questions"):
         existing_gaps = await aexec(db.schema("misir").table("gap").select("label").eq("space_id", space_id))
-        existing_labels = {g["label"].strip().lower() for g in (existing_gaps.data or [])}
-        new_gaps = [
-            {"space_id": space_id, "severity": "Medium", "label": q, "status": "open"}
-            for q in stage_a["open_questions"]
-            if q.strip().lower() not in existing_labels
+        existing_token_sets = [
+            _gap_tokens(g["label"]) for g in (existing_gaps.data or [])
         ]
+        new_gaps = []
+        for q in stage_a["open_questions"]:
+            q_tokens = _gap_tokens(q)
+            if any(_gap_similar(q_tokens, ex) for ex in existing_token_sets):
+                continue
+            new_gaps.append({"space_id": space_id, "severity": "Medium", "label": q, "status": "open"})
+            existing_token_sets.append(q_tokens)  # also dedupe within this batch
         if new_gaps:
             await aexec(db.schema("misir").table("gap").insert(new_gaps))
 
@@ -222,7 +301,10 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
     # Re-trigger synthesis for:
     # - artifacts with no synthesis row at all
     # - artifacts whose synthesis row has empty themes (LLM returned [] on first pass)
-    # Fires-and-forgets so it doesn't block the current response.
+    # Fires-and-forgets so it doesn't block the current response — but bounded:
+    # the in-flight set dedupes across concurrent dashboard loads (two tabs on
+    # the same space must not double-pay for the same Groq call), and the
+    # semaphore caps how many syntheses run at once.
     art_by_id = {a["id"]: a for a in artifacts}
     needs_synthesis = [
         a["id"] for a in artifacts
@@ -232,22 +314,28 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
     if needs_synthesis:
         async def _bg_synthesize(art_id: int) -> None:
             try:
-                art = art_by_id.get(art_id, {})
-                text = art.get("extracted_text") or art.get("title") or ""
-                if not text:
-                    return
-                from domain.entities.common import EngagementLevel as _EL
-                eng_str = art.get("engagement_level", "passive")
-                try:
-                    eng = _EL(eng_str)
-                except ValueError:
-                    eng = _EL.passive
-                from infrastructure.services.synthesis_service import get_synthesis_service
-                await get_synthesis_service().synthesize_artifact(art_id, text, eng)
+                async with _BG_SYNTHESIS_SEM:
+                    art = art_by_id.get(art_id, {})
+                    text = art.get("extracted_text") or art.get("title") or ""
+                    if not text:
+                        return
+                    from domain.entities.common import EngagementLevel as _EL
+                    eng_str = art.get("engagement_level", "passive")
+                    try:
+                        eng = _EL(eng_str)
+                    except ValueError:
+                        eng = _EL.passive
+                    from infrastructure.services.synthesis_service import get_synthesis_service
+                    await get_synthesis_service().synthesize_artifact(art_id, text, eng)
             except Exception as exc:
                 logger.warning("bg re-synthesis failed", artifact_id=art_id, error=str(exc))
+            finally:
+                _bg_synthesis_inflight.discard(art_id)
 
         for _mid in needs_synthesis:
+            if _mid in _bg_synthesis_inflight:
+                continue
+            _bg_synthesis_inflight.add(_mid)
             asyncio.ensure_future(_bg_synthesize(_mid))
 
     # Group artifacts by platform
@@ -282,6 +370,9 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
         # Aggregate themes from synthesis.
         # LLMs return themes in various formats — handle dicts with any key name,
         # plain strings, and nested structures.
+        # theme_map values are the SUPPORTING ARTIFACT IDS for each theme, so
+        # confidence below is computed per theme (not from the whole platform,
+        # which gave every theme the same score and made the sort meaningless).
         # Fallback chain (each level only runs if the previous produced nothing):
         #   1. synthesis themes  2. Stage A key_findings  3. synthesis top_insight/unique_signal  4. artifact titles
         theme_map: dict[str, list] = {}
@@ -303,14 +394,14 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
                     else:
                         key = ""
                     if key:
-                        theme_map.setdefault(key, []).append(t)
+                        theme_map.setdefault(key, []).append(s["artifact_id"])
 
         # Level 2: Stage A space-wide key_findings (no platform filter — better than nothing)
         if not theme_map and stage_a:
             for finding in stage_a.get("key_findings", []):
                 key = (finding.get("text") or "")[:60].strip()
                 if key:
-                    theme_map.setdefault(key, []).append(finding)
+                    theme_map.setdefault(key, []).extend(finding.get("supporting_artifact_ids") or [])
 
         # Level 3: use synthesis top_insight / unique_signal as pseudo-themes
         if not theme_map and p_synths:
@@ -320,48 +411,44 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
                     if val:
                         key = val[:60].rstrip(".,;:!?")
                         if key:
-                            theme_map.setdefault(key, []).append(s)
+                            theme_map.setdefault(key, []).append(s["artifact_id"])
 
         # Level 4: artifact titles (absolute last resort)
         if not theme_map:
             for a in p_arts:
                 title = (a.get("title") or "").strip()
                 if title:
-                    theme_map.setdefault(title[:60], []).append(a)
+                    theme_map.setdefault(title[:60], []).append(a["id"])
 
         if not theme_map:
             logger.warning("No themes found for platform", platform=platform, artifact_count=len(p_arts))
 
         themes = []
-        for text_key, t_list in list(theme_map.items())[:4]:
-            # compute confidence
+        from domain.entities.common import EngagementLevel
+        for text_key, support_ids in list(theme_map.items())[:4]:
+            # Confidence from the artifacts supporting THIS theme; fall back to
+            # the platform's artifacts when support isn't attributable (e.g. a
+            # Stage A finding citing artifacts outside this period window).
+            support_arts = [art_by_id[i] for i in set(support_ids) if i in art_by_id] or p_arts
             eng_mults = []
-            for a in p_arts:
-                from domain.entities.common import EngagementLevel
+            for a in support_arts:
                 try:
                     eng_mults.append(EngagementLevel(a["engagement_level"]).multiplier)
                 except Exception:
                     eng_mults.append(0.5)
             avg_eng = sum(eng_mults) / len(eng_mults) if eng_mults else 0.5
-            most_recent = max((datetime.fromisoformat(a["captured_at"].replace("Z", "+00:00")) for a in p_arts), default=now)
+            most_recent = max((datetime.fromisoformat(a["captured_at"].replace("Z", "+00:00")) for a in support_arts), default=now)
             conf = compute_theme_confidence(
-                supporting_artifact_count=len(p_arts),
+                supporting_artifact_count=len(support_arts),
                 avg_engagement_multiplier=avg_eng,
                 most_recent_artifact_at=most_recent,
                 platforms_used=1,
             )
             themes.append({"text": text_key, "conf": conf})
 
-        # Assign a colour per platform
-        PLATFORM_COLORS = {
-            "claude": "#C44820", "chatgpt": "#10A37F", "gemini": "#2A6A4A",
-            "perplexity": "#6B46C1", "deepseek": "#1E40AF", "grok": "#000000",
-            "copilot": "#0078D4", "notebooklm": "#EA4335", "kimi": "#FF6B35",
-            "web": "#2A4A7A",
-        }
         sources.append({
             "key": platform,
-            "label": platform.capitalize(),
+            "label": _platform_label(platform),
             "artifacts": len(p_arts),
             "color": PLATFORM_COLORS.get(platform, "#666"),
             "topInsight": top_insight,
@@ -404,7 +491,7 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
         pct = round(compute_research_depth_pct(len(p_arts), avg_eng, settings.RESEARCH_DEPTH_TARGET) * 100)
 
         # warn=true if this is the weakest topic and below 30%
-        research_depth.append({"label": p.capitalize(), "pct": pct, "warn": pct < 30})
+        research_depth.append({"label": _platform_label(p), "pct": pct, "warn": pct < 30})
 
     # ── Stage B: Misir's Read ─────────────────────────────────────────────────
     stage_a_hash = hashlib.sha256(json.dumps(stage_a or {}, sort_keys=True).encode()).hexdigest()[:16]
@@ -462,16 +549,27 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
         )
         cross_links = {r["source_artifact_id"] for r in (cl_rows.data or [])}
 
+    # Tags for the whole timeline in ONE query (was an N+1: one round trip per
+    # activity row).
+    activity_rows = activity_arts.data or []
+    tags_by_artifact: dict[int, list[str]] = {}
+    if activity_rows:
+        tag_rows = await aexec(
+            db.schema("misir")
+            .table("artifact_tag")
+            .select("artifact_id, tag")
+            .in_("artifact_id", [a["id"] for a in activity_rows])
+        )
+        for t in (tag_rows.data or []):
+            tags_by_artifact.setdefault(t["artifact_id"], []).append(t["tag"])
+
     activity = []
-    for a in (activity_arts.data or []):
-        # Tags
-        tags_row = await aexec(db.schema("misir").table("artifact_tag").select("tag").eq("artifact_id", a["id"]))
-        tags = [t["tag"] for t in (tags_row.data or [])]
+    for a in activity_rows:
         activity.append({
             "time": a["captured_at"],
-            "source": a["platform"].capitalize(),
+            "source": _platform_label(a["platform"]),
             "title": a.get("title") or "Untitled",
-            "tags": tags,
+            "tags": tags_by_artifact.get(a["id"], []),
             "revisit": open_counts.get(a["id"], 0) >= 2,
             "crossLink": a["id"] in cross_links,
         })
@@ -586,13 +684,48 @@ async def get_dashboard_payload(user_id: str, space_id: int, period: str, db, tz
 
 
 async def _get_or_build_report(user_id, space_id, kind, period, source_hash, db, builder):
+    """Fresh-cache hit → return it. Stale cache (older source_hash) → return the
+    stale payload NOW and rebuild in the background (stale-while-revalidate), so
+    a dashboard load never blocks on an LLM call once a report exists. Only the
+    very first build for a key runs inline.
+
+    Builds are serialized per (user, space, kind, period): without the lock,
+    concurrent loads each miss the cache and pay for their own LLM build before
+    one wins the upsert. The lock loser re-checks the cache and gets the
+    winner's result for free. (Per-process only — good enough to kill the
+    common two-tabs/refresh stampede.)"""
+    key = (user_id, space_id, kind, period)
+    lock = _report_build_locks.setdefault(key, asyncio.Lock())
+
     cached = await get_report_cache(user_id, space_id, kind, period, source_hash)
     if cached:
         return cached
-    result = await builder()
-    if result:
-        await set_report_cache(user_id, space_id, kind, period, source_hash, result)
-    return result
+
+    stale = await get_report_cache_any(user_id, space_id, kind, period)
+    if stale is not None:
+        async def _revalidate() -> None:
+            try:
+                async with lock:
+                    if await get_report_cache(user_id, space_id, kind, period, source_hash):
+                        return  # another request already rebuilt it
+                    result = await builder()
+                    if result:
+                        await set_report_cache(user_id, space_id, kind, period, source_hash, result)
+            except Exception as exc:
+                logger.warning("Background report revalidation failed", kind=kind, space_id=space_id, error=str(exc))
+
+        asyncio.ensure_future(_revalidate())
+        return stale
+
+    # First ever build for this key — nothing to serve, so build inline.
+    async with lock:
+        cached = await get_report_cache(user_id, space_id, kind, period, source_hash)
+        if cached:
+            return cached
+        result = await builder()
+        if result:
+            await set_report_cache(user_id, space_id, kind, period, source_hash, result)
+        return result
 
 
 def _parse_json_object(raw: str) -> dict:

@@ -32,11 +32,12 @@ class CrossSpaceLinker:
         threshold = settings.CROSS_SPACE_SIMILARITY_THRESHOLD
         db = get_supabase()
 
-        # Fetch artifact embedding
-        art = db.schema("misir").table("artifact").select("content_embedding").eq("id", artifact_id).single().execute()
-        if not art.data or not art.data.get("content_embedding"):
+        # Fetch artifact embedding. No .single() — supabase-py raises APIError on
+        # 0 rows (artifact deleted between capture and this background step).
+        art = db.schema("misir").table("artifact").select("content_embedding").eq("id", artifact_id).limit(1).execute()
+        if not art.data or not art.data[0].get("content_embedding"):
             return
-        art_vec = art.data["content_embedding"]
+        art_vec = art.data[0]["content_embedding"]
 
         # Fetch all open gaps with embeddings for THIS user (across spaces)
         gaps = (

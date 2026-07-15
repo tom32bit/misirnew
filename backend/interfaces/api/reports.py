@@ -44,9 +44,9 @@ async def get_dashboard(
 @limiter.limit(_settings.RATE_LIMIT_REGENERATE)
 async def regenerate_reports(
     request: Request,
+    background_tasks: BackgroundTasks,
     space_id: int,
     period: str = Query("week"),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Force a fresh Stage A + B pass for this space/period."""
