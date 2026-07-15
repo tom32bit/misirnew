@@ -123,3 +123,15 @@ export async function discardFailedArtifacts(): Promise<number> {
   await db.pendingArtifacts.bulkDelete(failed.map((a) => a.id!))
   return failed.length
 }
+
+// Synced rows are kept briefly (they serve the 24h duplicate-capture check),
+// then purged — each row holds the full extracted text, so leaving them
+// forever grew IndexedDB without bound. 48h > the 24h dedup window.
+const SYNCED_RETENTION_MS = 48 * 60 * 60 * 1000
+
+export async function purgeSyncedArtifacts(): Promise<number> {
+  const cutoff = new Date(Date.now() - SYNCED_RETENTION_MS)
+  return db.pendingArtifacts
+    .filter((a) => !!a.syncedAt && a.capturedAt < cutoff)
+    .delete()
+}

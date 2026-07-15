@@ -7,7 +7,7 @@ import { createConsola } from 'consola'
 import {
   db, getSubspacesWithMarkers, getPendingCount, clearLocalData,
   getFailedArtifacts, getFailedCount, requeueFailedArtifacts, discardFailedArtifacts,
-  MAX_SYNC_ATTEMPTS,
+  purgeSyncedArtifacts, MAX_SYNC_ATTEMPTS,
 } from '@/lib/db'
 import { apiCapture, apiUpdateEngagement, apiGetCache, apiGetMe, apiSyncConsent, apiLearnMarkers } from '@/lib/api'
 import { processText, extractLearnableTerms } from '@/lib/nlp'
@@ -557,7 +557,26 @@ async function handleUpdateEngagement(msg: UpdateEngagementMessage): Promise<voi
 
 // ── Retry pending (local queue → backend) ────────────────────────────────────
 
+// Overlap guard: a slow retry run (backend timing out per item) must not
+// overlap the next 5-min alarm firing — that double-submitted the same queued
+// artifacts. Module state resets on SW restart, which is fine: alarms restart
+// the cycle cleanly.
+let retryInFlight = false
+
 async function retryPending(): Promise<void> {
+  if (retryInFlight) {
+    log.debug('retryPending skipped — previous run still in flight')
+    return
+  }
+  retryInFlight = true
+  try {
+    await doRetryPending()
+  } finally {
+    retryInFlight = false
+  }
+}
+
+async function doRetryPending(): Promise<void> {
   const pending = await db.pendingArtifacts
     .filter((a) => !a.syncedAt && (a.syncAttempts ?? 0) < MAX_SYNC_ATTEMPTS)
     .toArray()
@@ -603,6 +622,14 @@ async function retryPending(): Promise<void> {
     } else {
       await db.pendingArtifacts.update(artifact.id!, { syncAttempts: (artifact.syncAttempts ?? 0) + 1 })
     }
+  }
+  // Housekeeping: drop synced rows past the dedup window so IndexedDB (which
+  // holds full extracted text per row) doesn't grow without bound.
+  try {
+    const purged = await purgeSyncedArtifacts()
+    if (purged) log.debug(`Purged ${purged} synced artifact(s) from the local queue`)
+  } catch {
+    /* best-effort */
   }
   await writeSyncStatus()
 }
@@ -1050,15 +1077,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Signed-in status — drives the popup's sign-in prompt. Rather than guess from
   // the (fragile, 60s-expiry) session cookie, we probe a real authenticated
   // endpoint: GET /me 403s ONLY on auth (no consent logic), so a 200 means we can
-  // truly authenticate and a 401/403 means we can't. A network error is "unknown"
-  // → we don't nag. This is ground truth, and the popup only polls it while the
-  // prompt is showing, so it clears the instant sign-in takes effect.
+  // truly authenticate and a 401/403 means we can't. A network error is a
+  // distinct "unknown" state (`known: false`, signedIn kept true so we don't
+  // nag someone who's merely offline) — the popup can tell the two apart.
+  // The popup only polls this while the prompt is showing, so it clears the
+  // instant sign-in takes effect.
   if (message.type === 'GET_AUTH_STATE') {
     apiGetMe()
-      .then(() => sendResponse({ signedIn: true }))
+      .then(() => sendResponse({ signedIn: true, known: true }))
       .catch((e: any) => {
         const status = e?.response?.status
-        sendResponse({ signedIn: !(status === 401 || status === 403) })
+        const definitive = status === 401 || status === 403
+        sendResponse({ signedIn: !definitive, known: definitive || status != null })
       })
     return true
   }

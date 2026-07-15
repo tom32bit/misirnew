@@ -364,7 +364,7 @@ function rankSubspaces(
 
     const candidate = {
       subspace,
-      matchedMarkerIds: getMatchedMarkerIds(nlpResult, subspace),
+      matchedMarkerIds: getMatchedMarkerIds(lower, nlpResult, subspace),
       confidence: score,
       nameScore: ns,
     }
@@ -479,20 +479,13 @@ function scoreMarker(lowerText: string, nlpResult: NLPResult, marker: { label: s
   return 0
 }
 
-function getMatchedMarkerIds(nlpResult: NLPResult, subspace: SubspaceWithMarkers): number[] {
-  const lowerTokens = new Set(nlpResult.tokens)
-  const lowerKeywords = new Set(nlpResult.keywords)
-  const lowerEntities = new Set(nlpResult.entities.map(e => e.toLowerCase()))
-
+// Report exactly the markers that scoreMarker counts as hits (same threshold as
+// the evidence gates). This used to apply looser criteria — e.g. any >2-char
+// word of a multi-word phrase — so matched_marker_ids disagreed with what the
+// score was built from, and the backend's per-subspace stats (which attribute
+// artifacts by marker-id overlap) were skewed by the phantom matches.
+function getMatchedMarkerIds(lowerText: string, nlpResult: NLPResult, subspace: SubspaceWithMarkers): number[] {
   return subspace.markers
-    .filter((marker) => {
-      const label = marker.label.toLowerCase()
-      return (
-        lowerTokens.has(label) ||
-        lowerKeywords.has(label) ||
-        lowerEntities.has(label) ||
-        label.split(/\s+/).some(w => w.length > 2 && (lowerTokens.has(w) || lowerKeywords.has(w)))
-      )
-    })
-    .map(m => m.id)
+    .filter((marker) => scoreMarker(lowerText, nlpResult, marker) >= MARKER_HIT_STRENGTH)
+    .map((m) => m.id)
 }
