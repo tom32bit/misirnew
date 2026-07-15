@@ -49,7 +49,7 @@ jobs:
         continue-on-error: true
 
   extension-v2:
-    name: Extension v2 (typecheck + tests + build)
+    name: Extension (typecheck + tests + build)
     runs-on: ubuntu-latest
     defaults:
       run:

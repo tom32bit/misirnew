@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ============================================================
-   Claude dark design system (from design_handoff_claude_dark).
+   Claude dark design system — this file is the source of truth.
    shadcn tokens are HSL triples (tailwind wraps them as hsl(...));
    the --m-* tokens are direct colors for bespoke inline styles.
    ============================================================ */
