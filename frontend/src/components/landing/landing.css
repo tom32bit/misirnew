@@ -152,13 +152,19 @@ html:has(.landing) { scroll-behavior: smooth; }
     text-wrap: balance; margin: 18px 0 20px;
   }
   h1 em { font-style: normal; color: var(--accent); }
+  .h2 em { font-style: normal; color: var(--accent); }
   .hero-sub {
     font-family: var(--font-serif); font-size: 16.5px; line-height: 1.7;
     color: var(--fg-muted); max-width: 48ch; text-wrap: pretty;
   }
   .hero-sub .hl { color: var(--accent); font-weight: 600; }
+  .hero-lead {
+    font-family: var(--font-serif); font-size: 16.5px; line-height: 1.7;
+    margin: 18px 0 0;
+  }
+  .hero-lead .hl { color: var(--accent); font-weight: 600; }
   .hero-points {
-    list-style: none; padding: 0; margin: 16px 0 0;
+    list-style: none; padding: 0; margin: 10px 0 0;
     display: flex; flex-direction: column; gap: 9px;
   }
   .hero-points li { display: flex; gap: 10px; align-items: baseline; font-size: 14.5px; color: var(--fg-muted); }
@@ -349,6 +355,8 @@ html:has(.landing) { scroll-behavior: smooth; }
   /* ── Final CTA + footer ──────────────────────────────────────────── */
   .final { text-align: center; }
   .final .h2 { max-width: 560px; margin-left: auto; margin-right: auto; }
+  .final-media { margin: 32px auto 0; max-width: 560px; }
+  .final-media video { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); }
   .final-note { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--fg-faint); margin-top: 16px; }
 
   footer { border-top: 1px solid var(--border); padding: 26px 0 40px; }
@@ -371,6 +379,7 @@ html:has(.landing) { scroll-behavior: smooth; }
     .hero-grid { grid-template-columns: 1fr; gap: 44px; }
     .hero-copy { text-align: center; max-width: 560px; margin: 0 auto; }
     .hero-sub { margin-left: auto; margin-right: auto; }
+    .hero-lead { text-align: center; }
     /* Bullets stay left-aligned as a block, centered as a group. */
     .hero-points { width: fit-content; margin-left: auto; margin-right: auto; text-align: left; }
     .hero-ctas { justify-content: center; }

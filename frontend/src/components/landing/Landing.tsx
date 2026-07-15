@@ -99,10 +99,10 @@ export function Landing() {
             <div className="eyebrow accent rise d1">For founders &amp; operators making high-stakes calls</div>
             <h1 className="rise d2">Turn scattered reading into decisions you can <em>defend.</em></h1>
             <p className="hero-sub rise d3">
-              You&apos;re deciding something that matters — a raise, a pricing change, a key hire.
+              You&apos;re deciding something that matters: a raise, a pricing change, a key hire.
               Your best thinking is buried in AI chats and tabs you&apos;ll never open again.
-              <strong className="hl">Misir:</strong>
             </p>
+            <p className="hero-lead rise d3"><strong className="hl">Misir:</strong></p>
             <ul className="hero-points rise d3">
               <li><span className="chk">✓</span>Captures as you read and chat with AI</li>
               <li><span className="chk">✓</span>Shows where your sources disagree</li>
@@ -138,10 +138,10 @@ export function Landing() {
             <div className="eyebrow">The problem</div>
             <h2 className="h2">Twenty tabs. Four AI chats. <br />A decision that keeps slipping.</h2>
             <p>
-              Everything you learn lives somewhere else — a ChatGPT thread here, a memo there,
+              Everything you learn lives somewhere else: a ChatGPT thread here, a memo there,
               a founder&apos;s blog post you&apos;ll never find again. When it&apos;s time to decide, you can&apos;t
               see what you actually know, where your sources disagree, or what&apos;s still missing.
-              <em>Misir keeps that ledger for you.</em>
+              <br /><em>Misir keeps that ledger for you.</em>
             </p>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function Landing() {
                 <h3>Capture without thinking about it.</h3>
                 <p>
                   The extension reads the page <b>on your device</b>, matches it to the right
-                  space, and offers one-click save — mid-article or mid-AI-chat.
+                  space, and offers one-click save, mid-article or mid-AI-chat.
                   No folders, no tagging, no copy-paste.
                 </p>
               </div>
@@ -192,9 +192,9 @@ export function Landing() {
               <div className="hstep-art">
                 <div className="mini">
                   <div className="mini-head">Where your sources differ</div>
-                  <div className="mini-row"><span className="who" style={{ color: "#10A37F" }}>ChatGPT</span><span className="what">Optimize for speed — take the SAFE, close in three weeks.</span></div>
+                  <div className="mini-row"><span className="who" style={{ color: "#10A37F" }}>ChatGPT</span><span className="what">Optimize for speed: take the SAFE, close in three weeks.</span></div>
                   <div className="mini-row"><span className="who" style={{ color: "#2A6A9A" }}>Web</span><span className="what">Priced rounds protect you when the next raise is uncertain.</span></div>
-                  <div className="mini-row"><span className="who" style={{ color: "var(--accent)" }}>Your edge</span><span className="what">You&apos;ve seen both failure modes — your sources haven&apos;t.</span></div>
+                  <div className="mini-row"><span className="who" style={{ color: "var(--accent)" }}>Your edge</span><span className="what">You&apos;ve seen both failure modes. Your sources haven&apos;t.</span></div>
                 </div>
               </div>
             </div>
@@ -234,7 +234,7 @@ export function Landing() {
           <div className="privacy-grid">
             <div className="reveal">
               <div className="eyebrow accent">Private by architecture</div>
-              <h2 className="h2">Your reading is understood <br />on your machine — not our servers.</h2>
+              <h2 className="h2">Your reading is understood <br />on your machine, not our servers.</h2>
               <p className="lede">
                 The semantic matching that decides &quot;this page belongs to that decision&quot; runs
                 entirely in your browser, on-device. Pages you don&apos;t save are never sent
@@ -256,7 +256,7 @@ export function Landing() {
         <div className="wrap section-pad">
           <div className="problem reveal" style={{ marginBottom: 0 }}>
             <div className="eyebrow accent">Always on watch</div>
-            <h2 className="h2">What Misir notices for you.</h2>
+            <h2 className="h2">What Misir notices for you</h2>
           </div>
           <div className="features">
             <div className="feature w2 reveal">
@@ -274,7 +274,7 @@ export function Landing() {
                 </div>
               </div>
               <h4>Where sources differ</h4>
-              <p>Every space tracks its central disagreement — and which side your evidence actually supports.</p>
+              <p>Every space tracks its central disagreement, and which side your evidence actually supports.</p>
             </div>
 
             <div className="feature reveal">
@@ -299,7 +299,7 @@ export function Landing() {
                 </div>
               </div>
               <h4>Nudges with consequences</h4>
-              <p>Not &quot;3 unread items&quot; — but &quot;your evidence is one-sided and your deadline is Friday.&quot;</p>
+              <p>Not &quot;3 unread items,&quot; but &quot;your evidence is one-sided and your deadline is Friday.&quot;</p>
             </div>
 
             <div className="feature reveal">
@@ -309,7 +309,7 @@ export function Landing() {
                 </div>
               </div>
               <h4>Capture rhythm</h4>
-              <p>See when you&apos;re doing the work — and when a decision has quietly gone cold.</p>
+              <p>See when you&apos;re doing the work, and when a decision has quietly gone cold.</p>
             </div>
 
             <div className="feature reveal">
@@ -328,7 +328,7 @@ export function Landing() {
               <div className="fviz">
                 <div className="viz-chat">
                   <span className="u">What&apos;s my biggest open risk?</span>
-                  <span className="m">Bridge terms in a down market — none of your sources cover it.<span className="cite">1</span><span className="cite">2</span></span>
+                  <span className="m">Bridge terms in a down market. None of your sources cover it.<span className="cite">1</span><span className="cite">2</span></span>
                 </div>
               </div>
               <h4>Ask Misir</h4>
@@ -341,10 +341,20 @@ export function Landing() {
       <section className="final">
         <div className="wrap section-pad reveal">
           <div className="eyebrow accent">Misir</div>
-          <h2 className="h2">Your next decision deserves the full picture.</h2>
+          <h2 className="h2">Your next <em>decision</em> deserves the full picture.</h2>
           <div className="hero-ctas" style={{ justifyContent: "center" }}>
             <Link href="/sign-up" className="btn btn-primary">Claim your free beta access</Link>
           </div>
+          <figure className="final-media">
+            <video
+              src="/landing/end_hero.webm"
+              autoPlay
+              loop
+              muted
+              playsInline
+              aria-label="Misir capturing reading and AI chats into a decision."
+            />
+          </figure>
           <p className="final-note">Beta spots are free · No card · Your data stays yours</p>
         </div>
       </section>
