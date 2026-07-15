@@ -1,6 +1,7 @@
 "use client"
 
 import { ReadinessRing } from "@/components/misir/primitives/ReadinessRing"
+import { ProgressBar } from "@/components/misir/primitives/Card"
 import type { Deadline } from "@/lib/api/types"
 
 type DecisionOption = { label: string; note: string }
@@ -25,7 +26,7 @@ export function DecisionHero({
   deadline: Deadline | null | undefined
 }) {
   return (
-    <div className="rounded-[10px] border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.22)] dark:bg-[rgba(217,119,87,0.07)]">
+    <div className="rounded-panel border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.22)] dark:bg-[rgba(217,119,87,0.07)]">
       <div className="mb-1.5 font-sans text-[10.5px] uppercase tracking-[0.08em] text-accent">
         Active strategic decision
       </div>
@@ -93,15 +94,14 @@ function Option({
       >
         {opt.label}
       </div>
-      <div className="h-[3px] w-full overflow-hidden rounded-[3px] bg-border-strong">
-        <div
-          className="h-full"
-          style={{
-            width: `${opt.readiness ?? 0}%`,
-            background: primary ? "var(--accent)" : "var(--fg-faint)",
-          }}
+      {/* Per-option readiness renders only when the backend actually provides
+          it — an empty bar would read as a (false) "0% readiness" claim. */}
+      {opt.readiness != null && (
+        <ProgressBar
+          value={opt.readiness}
+          color={primary ? "var(--accent)" : "var(--fg-faint)"}
         />
-      </div>
+      )}
       <div
         className={[
           "inline-flex items-center gap-2 font-sans text-[11px]",

@@ -14,6 +14,7 @@ import hashlib
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from auth.clerk import CurrentUser, get_current_user
@@ -64,6 +65,30 @@ def _compute_window(period: str, date_str, tz_offset_minutes: int, now):
         return now - timedelta(days=30), None
     else:
         return now - timedelta(days=7), None
+
+
+def _sanitize_captured_at(raw, now):
+    """Clamp a client-supplied capture timestamp to [now - 30d, now].
+
+    30 days generously covers the extension's offline retry queue (5-min alarm,
+    plus manually requeued failed saves); anything outside the window is a bug
+    or abuse, so it's clamped rather than trusted. Unparseable → server time.
+    """
+    from datetime import datetime, timedelta, timezone
+    if not raw:
+        return now.isoformat()
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return now.isoformat()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    earliest = now - timedelta(days=30)
+    if dt > now:
+        dt = now
+    elif dt < earliest:
+        dt = earliest
+    return dt.isoformat()
 
 
 # ── Request / response models ─────────────────────────────────────────────────
@@ -167,8 +192,10 @@ def capture_artifact(
 
     from datetime import datetime, timezone
     # Use client-supplied timestamp when available (preserves offline capture
-    # time through retries). Fall back to server clock only for old clients.
-    captured_now = body.captured_at or datetime.now(timezone.utc).isoformat()
+    # time through retries), but CLAMPED to a sane window — an unvalidated
+    # timestamp lets a buggy/malicious client backdate artifacts past the
+    # retention window or date them into the future. Falls back to server time.
+    captured_now = _sanitize_captured_at(body.captured_at, datetime.now(timezone.utc))
 
     artifact_data = {
         "user_id": user_id,
@@ -197,23 +224,42 @@ def capture_artifact(
     # On re-capture: update content/engagement fields but NEVER overwrite
     # captured_at — the original capture date must stay intact so the
     # TodayTimeline doesn't show old articles as new captures.
-    existing = (
-        db.schema("misir")
-        .table("artifact")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("normalized_url", body.normalized_url)
-        .execute()
-    )
+    def _find_existing():
+        return (
+            db.schema("misir")
+            .table("artifact")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("normalized_url", body.normalized_url)
+            .execute()
+        )
+
+    def _update_existing(existing_id: int) -> None:
+        update_data = {k: v for k, v in artifact_data.items() if k != "captured_at"}
+        db.schema("misir").table("artifact").update(update_data).eq("id", existing_id).execute()
+
+    existing = _find_existing()
     if existing.data:
         artifact_id = existing.data[0]["id"]
-        update_data = {k: v for k, v in artifact_data.items() if k != "captured_at"}
-        db.schema("misir").table("artifact").update(update_data).eq("id", artifact_id).execute()
+        _update_existing(artifact_id)
         artifact = {"id": artifact_id, **artifact_data}
     else:
-        row = db.schema("misir").table("artifact").insert(artifact_data).execute()
-        artifact = row.data[0]
-        artifact_id = artifact["id"]
+        try:
+            row = db.schema("misir").table("artifact").insert(artifact_data).execute()
+            artifact = row.data[0]
+            artifact_id = artifact["id"]
+        except APIError as exc:
+            # A concurrent capture of the same URL won the race between our
+            # existence check and this insert (unique idx_artifact_user_url).
+            # Fall back to updating the winner's row instead of 500ing.
+            if getattr(exc, "code", None) != "23505":
+                raise
+            existing = _find_existing()
+            if not existing.data:
+                raise
+            artifact_id = existing.data[0]["id"]
+            _update_existing(artifact_id)
+            artifact = {"id": artifact_id, **artifact_data}
 
     # Insert open event
     db.schema("misir").table("artifact_open_event").insert({
@@ -264,12 +310,14 @@ def update_engagement(
     db = get_supabase()
     user_id = _resolve_user_id(db, current_user.clerk_user_id)
 
-    # Fetch current level to detect upgrade
-    existing = db.schema("misir").table("artifact").select("id, engagement_level, space_id, extracted_text, content_source, word_count").eq("id", artifact_id).eq("user_id", user_id).single().execute()
+    # Fetch current level to detect upgrade. No .single() — supabase-py raises
+    # APIError on 0 rows, which would surface as a 500 instead of this 404.
+    existing = db.schema("misir").table("artifact").select("id, engagement_level, space_id, extracted_text, content_source, word_count").eq("id", artifact_id).eq("user_id", user_id).limit(1).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Artifact not found")
+    art = existing.data[0]
 
-    old_level = existing.data["engagement_level"]
+    old_level = art["engagement_level"]
     new_level = body.engagement_level.value
     new_weight = body.engagement_level.base_weight
 
@@ -286,21 +334,21 @@ def update_engagement(
     if ENGAGEMENT_ORDER.index(new_level) > ENGAGEMENT_ORDER.index(old_level) and old_level == "latent":
         job = {
             "artifact_id": artifact_id, "user_id": user_id,
-            "space_id": existing.data.get("space_id"),
+            "space_id": art.get("space_id"),
             "engagement": body.engagement_level.value,
-            "content_source": existing.data.get("content_source", "web"),
-            "word_count": existing.data.get("word_count", 0),
+            "content_source": art.get("content_source", "web"),
+            "word_count": art.get("word_count", 0),
         }
         if not enqueue("post_capture", job):
             background_tasks.add_task(
                 _post_capture_pipeline,
                 artifact_id=artifact_id,
                 user_id=user_id,
-                space_id=existing.data.get("space_id"),
-                text=existing.data.get("extracted_text") or "",
+                space_id=art.get("space_id"),
+                text=art.get("extracted_text") or "",
                 engagement=body.engagement_level,
-                content_source=existing.data.get("content_source", "web"),
-                word_count=existing.data.get("word_count", 0),
+                content_source=art.get("content_source", "web"),
+                word_count=art.get("word_count", 0),
             )
 
     return {"id": artifact_id, "engagement_level": new_level}
@@ -393,8 +441,13 @@ def list_artifacts(
         query = query.lt("captured_at", until.isoformat())
 
     if q:
-        # Text search on title + extracted_text (Supabase full-text search)
-        query = query.text_search("title", q)
+        # Full-text search over title AND extracted_text (websearch syntax, so
+        # raw user input is safe). Commas/parens are stripped — they're the
+        # PostgREST or= filter's own separators and would corrupt the filter.
+        import re as _re
+        safe_q = _re.sub(r"[,()]", " ", q).strip()
+        if safe_q:
+            query = query.or_(f"title.wfts.{safe_q},extracted_text.wfts.{safe_q}")
 
     rows = query.order("captured_at", desc=True).range(offset, offset + limit - 1).execute()
     return rows.data or []
@@ -409,10 +462,8 @@ def delete_artifact(artifact_id: int, current_user: CurrentUser = Depends(get_cu
     existing = db.schema("misir").table("artifact").select("id").eq("id", artifact_id).eq("user_id", user_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    db.schema("misir").table("source_synthesis").delete().eq("artifact_id", artifact_id).execute()
-    db.schema("misir").table("artifact_open_event").delete().eq("artifact_id", artifact_id).execute()
-    db.schema("misir").table("artifact_tag").delete().eq("artifact_id", artifact_id).execute()
-    db.schema("misir").table("cross_space_link").delete().eq("source_artifact_id", artifact_id).execute()
+    # One atomic delete — source_synthesis, open events, tags, and cross-links
+    # all cascade via the schema's ON DELETE CASCADE FKs.
     db.schema("misir").table("artifact").delete().eq("id", artifact_id).eq("user_id", user_id).execute()
 
 

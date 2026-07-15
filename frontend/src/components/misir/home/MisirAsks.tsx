@@ -257,7 +257,7 @@ function Card({
     <div
       style={style}
       className={[
-        "relative overflow-hidden rounded-[14px] border bg-[color-mix(in_srgb,var(--ma-color,var(--accent))_11%,var(--bg))]",
+        "relative overflow-hidden rounded-panel border bg-[color-mix(in_srgb,var(--ma-color,var(--accent))_11%,var(--bg))]",
         "border-[color-mix(in_srgb,var(--ma-color,var(--accent))_35%,var(--border))]",
         "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:bg-[var(--ma-color,var(--accent))]",
       ].join(" ")}

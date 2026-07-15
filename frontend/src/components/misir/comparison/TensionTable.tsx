@@ -1,6 +1,7 @@
 "use client"
 
 import type { KeyTension } from "@/lib/api/types"
+import { platformLabel } from "@/lib/constants/surface-icons"
 import type { SourceVM } from "./ComparisonView"
 
 /**
@@ -26,7 +27,8 @@ export function TensionTable({
     tension?.points && tension.points.length > 0
       ? tension.points.map((p, i) => ({
           num: p.num || String(i + 1).padStart(2, "0"),
-          from: p.label,
+          // LLM-authored labels arrive as "chatgpt", "Chatgpt:", etc.
+          from: platformLabel(p.label),
           stance: p.text,
         }))
       : sources
@@ -40,7 +42,7 @@ export function TensionTable({
   if (points.length === 0 && !edge) return null
 
   return (
-    <div className="rounded-lg border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.28)] dark:bg-[rgba(217,119,87,0.08)]">
+    <div className="rounded-panel border border-[rgba(217,119,87,0.2)] bg-[rgba(217,119,87,0.04)] px-[22px] py-5 dark:border-[rgba(217,119,87,0.28)] dark:bg-[rgba(217,119,87,0.08)]">
       <div className="mb-3.5 font-sans text-[10.5px] uppercase tracking-[0.08em] text-accent">
         Conflicting take · {title}
       </div>

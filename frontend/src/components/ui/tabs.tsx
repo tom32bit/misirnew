@@ -29,7 +29,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         "transition-colors cursor-pointer",
         "hover:text-fg",
         "data-[state=active]:text-[#207FDE] data-[state=active]:border-[#207FDE]",
-        "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_#61AAF2]",
+        "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-ring)]",
         "disabled:pointer-events-none disabled:opacity-40",
         className,
       )}

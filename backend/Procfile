@@ -1,4 +1,9 @@
-web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# --forwarded-allow-ips="*": trust X-Forwarded-For from the platform router so
+# the IP-keyed global rate limit sees real client IPs. Without it every user
+# shares the proxy's IP — one noisy client 429s everyone. "*" is safe ONLY
+# because dynos are reachable exclusively through the platform router (which
+# sets these headers); never use it on a directly-exposed host.
+web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --forwarded-allow-ips="*"
 # Required ONLY when JOB_QUEUE_ENABLED=true — processes the post-capture
 # embedding/synthesis queue. Without it, enqueued jobs pile up unprocessed.
 worker: python -m infrastructure.jobs.worker

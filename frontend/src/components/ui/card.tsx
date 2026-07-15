@@ -1,11 +1,12 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { Icon } from "@/components/misir/primitives/Icon"
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("rounded-lg border border-[var(--border)] bg-bg-subtle", className)}
+      className={cn("rounded-panel border border-[var(--border)] bg-bg-subtle", className)}
       {...props}
     />
   )
@@ -38,22 +39,32 @@ function SectionHead({
   title,
   small,
   right,
+  icon,
   className,
 }: {
   title: React.ReactNode
   small?: React.ReactNode
   right?: React.ReactNode
+  /** Lucide icon name — renders a small outlined tile before the title. */
+  icon?: string
   className?: string
 }) {
   return (
-    <div className={cn("flex items-baseline justify-between gap-3 px-0.5 pt-1.5", className)}>
-      <div className="text-[14px] font-medium text-fg">
-        {title}
-        {small ? (
-          <small className="ml-1.5 text-[12px] font-normal text-fg-subtle">{small}</small>
+    <div className={cn("flex items-center justify-between gap-3 px-0.5 pt-1.5", className)}>
+      <div className="flex min-w-0 items-center gap-2 text-[14px] font-medium text-fg">
+        {icon ? (
+          <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md border border-border bg-bg-subtle text-fg-muted">
+            <Icon name={icon} size={12} />
+          </span>
         ) : null}
+        <span className="min-w-0">
+          {title}
+          {small ? (
+            <small className="ml-1.5 text-[12px] font-normal text-fg-subtle">{small}</small>
+          ) : null}
+        </span>
       </div>
-      {right ? <div className="flex items-center gap-2.5">{right}</div> : null}
+      {right ? <div className="flex flex-none items-center gap-2.5">{right}</div> : null}
     </div>
   )
 }

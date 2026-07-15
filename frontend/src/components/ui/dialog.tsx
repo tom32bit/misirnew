@@ -130,7 +130,7 @@ function DialogCloseButton({ className }: { className?: string }) {
       className={cn(
         "ml-auto grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-md",
         "text-fg-subtle hover:bg-[var(--bg-hover)] hover:text-fg",
-        "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_#61AAF2]",
+        "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-ring)]",
         "transition-colors",
         className,
       )}

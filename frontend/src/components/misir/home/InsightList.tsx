@@ -17,11 +17,11 @@ type DynamicInsight = {
 }
 
 const TYPE_META: Record<InsightType, { label: string; icon: string; color: string; bg: string }> = {
-  nudge:       { label: "Nudge",       icon: "zap",        color: "#FF6C3C", bg: "rgba(255,108,60,0.03)"  },
-  gap:         { label: "Gap",         icon: "git-branch", color: "#C0392B", bg: "rgba(192,57,43,0.03)"   },
-  cross_space: { label: "Cross-space", icon: "link-2",     color: "#2A4A7A", bg: "rgba(42,74,122,0.03)"   },
-  activity:    { label: "Activity",    icon: "activity",   color: "#2E7D55", bg: "rgba(46,125,85,0.03)"    },
-  synthesis:   { label: "Synthesis",   icon: "layers",     color: "#6E6862", bg: "rgba(110,104,98,0.03)"   },
+  nudge:       { label: "Nudge",       icon: "zap",        color: "var(--color-accent)",      bg: "color-mix(in srgb, var(--color-accent) 3%, transparent)" },
+  gap:         { label: "Gap",         icon: "git-branch", color: "var(--color-danger)",      bg: "color-mix(in srgb, var(--color-danger) 3%, transparent)" },
+  cross_space: { label: "Cross-space", icon: "link-2",     color: "var(--color-accent-blue)", bg: "color-mix(in srgb, var(--color-accent-blue) 3%, transparent)" },
+  activity:    { label: "Activity",    icon: "activity",   color: "var(--color-success)",     bg: "color-mix(in srgb, var(--color-success) 3%, transparent)" },
+  synthesis:   { label: "Synthesis",   icon: "layers",     color: "var(--fg-subtle)",         bg: "color-mix(in srgb, var(--fg-subtle) 3%, transparent)" },
 }
 
 const SEV_RANK: Record<string, number> = { Critical: 3, High: 2, Medium: 1 }
@@ -141,16 +141,17 @@ export function InsightList({
   return (
     <>
       <SectionHead
+        icon="sparkles"
         title="What Misir noticed"
         small={`${insights.length} thing${insights.length === 1 ? "" : "s"} worth knowing`}
       />
 
-      <div className="overflow-hidden rounded-[10px] border border-border">
-        {insights.map((ins, i) => {
+      <div className="overflow-hidden rounded-panel border border-border">
+        {insights.map((ins) => {
           const meta = TYPE_META[ins.type]
           return (
             <Link
-              key={i}
+              key={`${ins.type}:${ins.href}`}
               href={ins.href}
               className="flex items-center gap-5 border-b border-border bg-bg px-5 py-4 transition-colors last:border-b-0 hover:bg-[var(--ins-bg)] mobile:flex-col mobile:items-start mobile:gap-2.5 mobile:px-3"
               style={{ ["--ins-bg" as string]: meta.bg } as React.CSSProperties}

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { Card, ProgressBar } from "@/components/ui/card"
+import { CountUp } from "@/components/misir/primitives/CountUp"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
 import type { Subspace } from "@/lib/api/types"
 import type { SubspaceVM } from "@/lib/api/capture-adapters"
@@ -71,7 +72,7 @@ function SubspaceCard({
         }
       }}
       className={[
-        "flex h-[150px] cursor-pointer flex-col gap-3 rounded-[14px] p-[18px]",
+        "flex h-[150px] cursor-pointer flex-col gap-3 rounded-panel p-[18px]",
         "transition-[transform,border-color,background-color] duration-150",
         "hover:-translate-y-0.5 hover:border-border-strong hover:bg-bg-muted",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
@@ -99,7 +100,7 @@ function SubspaceCard({
         <div className="flex items-center gap-3">
           <ProgressBar value={vm.completeness} color={color} className="flex-1" />
           <span className="whitespace-nowrap text-[11px] tabular-nums text-fg-faint">
-            {vm.captures} source{vm.captures === 1 ? "" : "s"}
+            <CountUp value={vm.captures} /> source{vm.captures === 1 ? "" : "s"}
           </span>
         </div>
         {started ? (
@@ -108,7 +109,7 @@ function SubspaceCard({
             style={{ color }}
           >
             <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-            {vm.completeness}% ready
+            <CountUp value={vm.completeness} suffix="%" />&nbsp;ready
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 text-[11px] text-fg-subtle">

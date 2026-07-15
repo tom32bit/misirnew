@@ -10,7 +10,7 @@ export const buttonVariants = cva(
     "inline-flex items-center justify-center gap-1.5 rounded-md",
     "font-sans font-medium whitespace-nowrap select-none",
     "transition-colors cursor-pointer",
-    "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_#61AAF2]",
+    "focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-ring)]",
     "disabled:pointer-events-none disabled:opacity-35",
   ].join(" "),
   {

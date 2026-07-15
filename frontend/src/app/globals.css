@@ -161,7 +161,8 @@
   --color-clay-border: #9C5A3C;
 
   /* ── States ─────────────────────────────────────────────────────────── */
-  --color-focus:   #61AAF2;
+  /* ONE focus language app-wide: the accent. Change it here, nowhere else. */
+  --color-focus:   var(--color-accent);
   --color-danger:  #BF4D43;
   --color-success: #2E7D55;
   --color-warning: #B8730D;
@@ -179,8 +180,8 @@
   --color-border:        var(--border);
   --color-border-strong: var(--border-strong);
 
-  /* ── Ring — blue per design system ─────────────────────────────────── */
-  --color-ring: #61AAF2;
+  /* ── Ring — alias of the focus token (kept for shadcn-style utilities) ─ */
+  --color-ring: var(--color-focus);
 
   /* ── Type scale ─────────────────────────────────────────────────────── */
   --text-2xs:  11px;
@@ -212,6 +213,8 @@
   --radius-md:   6px;
   --radius-lg:   8px;
   --radius-xl:   12px;
+  /* Canonical radius for panel-level surfaces (cards, list containers). */
+  --radius-panel: 10px;
   --radius-pill: 999px;
 
   /* ── Shadows ────────────────────────────────────────────────────────── */
@@ -276,6 +279,15 @@
   --border:        rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.16);
 
+  /* Elevation needs stronger shadows on a dark ground — the light-theme
+     values are nearly invisible against #262625. Utilities reference these
+     via var(), so overriding here re-themes every shadow-* consumer. */
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md:      0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg:      0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-pop:     0 18px 48px rgba(0, 0, 0, 0.65);
+  --shadow-popover: 0 8px 32px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+
   color-scheme: dark;
 }
 
@@ -305,7 +317,7 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #61AAF2;
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -333,6 +345,35 @@
 @keyframes sheet-up {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Skeleton shimmer — directional gradient sweep over the muted surface. */
+.misir-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--bg-muted) 30%,
+    var(--bg-inset) 45%,
+    var(--bg-muted) 60%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Reduced motion — freeze CSS animations/transitions ───────────────────
+   MotionConfig (providers.tsx) only gates spring transforms; this covers the
+   CSS layer: shimmer, pulse-dot, typing-bounce, sheet-up, hover transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Mobile sheet modal ───────────────────────────────────────────────── */

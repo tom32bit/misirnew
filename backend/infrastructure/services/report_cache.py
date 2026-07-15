@@ -64,6 +64,25 @@ async def get_report_cache(user_id: str, space_id: int, kind: str, period: str, 
     return None
 
 
+async def get_report_cache_any(user_id: str, space_id: int, kind: str, period: str) -> Optional[dict]:
+    """The stored report for this key REGARDLESS of source_hash — i.e. possibly
+    STALE. Used for stale-while-revalidate: serve this instantly and rebuild in
+    the background instead of blocking the dashboard on an LLM call."""
+    db = get_supabase()
+    row = await aexec(
+        db.schema("misir")
+        .table("report")
+        .select("payload")
+        .eq("user_id", user_id)
+        .eq("space_id", space_id)
+        .eq("kind", kind)
+        .eq("period", period)
+    )
+    if row.data:
+        return row.data[0]["payload"]
+    return None
+
+
 async def set_report_cache(user_id: str, space_id: int, kind: str, period: str, source_hash: str, payload: dict) -> None:
     db = get_supabase()
     await aexec(db.schema("misir").table("report").upsert(

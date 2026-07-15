@@ -45,16 +45,16 @@ export function SynthesisGrid({
       >
         <SynthesisCol
           icon="check"
-          iconColor="var(--success)"
-          iconBg="rgba(46,125,85,0.1)"
+          iconColor="var(--color-success)"
+          iconBg="color-mix(in srgb, var(--color-success) 10%, transparent)"
           label="Where they agree"
           body={consensus || "—"}
           divider
         />
         <SynthesisCol
           icon="alert-triangle"
-          iconColor="var(--warning)"
-          iconBg="rgba(184,115,13,0.1)"
+          iconColor="var(--color-warning)"
+          iconBg="color-mix(in srgb, var(--color-warning) 10%, transparent)"
           label="Where they conflict"
           body={conflict || "—"}
           divider

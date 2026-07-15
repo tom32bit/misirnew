@@ -21,7 +21,7 @@ function SelectTrigger({
         "flex h-[45px] w-full cursor-pointer items-center justify-between gap-1.5 rounded-md",
         "border border-[var(--border-strong)] bg-bg px-3 text-[13px] text-fg",
         "outline-none transition-[border-color,box-shadow] duration-[120ms]",
-        "focus:border-[#61AAF2] focus:shadow-[0_0_0_2px_rgba(97,170,242,0.25)]",
+        "focus:border-[var(--color-ring)] focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-ring)_25%,transparent)]",
         "disabled:pointer-events-none disabled:opacity-40",
         "data-[placeholder]:text-fg-faint",
         className,

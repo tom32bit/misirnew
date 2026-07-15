@@ -45,11 +45,22 @@ configure_logging(settings.LOG_LEVEL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm up embedding model on startup (non-blocking; loads in background thread)
+    # Warm up the embedding model WITHOUT blocking startup: the load runs on a
+    # worker thread while the app already serves requests (an embed that arrives
+    # first just waits on the same model lock). Awaiting here would hold up
+    # startup — and failing health checks — for the whole ~1GB model load.
     import asyncio
     from infrastructure.services.embedding_service import get_embedding_service
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, lambda: get_embedding_service())
+
+    def _warm() -> None:
+        try:
+            get_embedding_service().warm_up()
+        except Exception:  # warm-up is best-effort; first embed retries the load
+            import logging
+            logging.getLogger(__name__).exception("Embedding model warm-up failed")
+
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _warm)
     yield
 
 

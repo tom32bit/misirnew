@@ -7,6 +7,9 @@ import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboard } from "@/lib/hooks/useDashboard"
 import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import { getSpaceColor } from "@/lib/constants/space-colors"
+import { platformLabel } from "@/lib/constants/surface-icons"
+import { Skeleton } from "@/components/misir/primitives/Skeleton"
+import { CountUp } from "@/components/misir/primitives/CountUp"
 import type {
   DashboardSource,
   Space,
@@ -46,7 +49,9 @@ function toSourceVMs(sources: DashboardSource[]): SourceVM[] {
     } else {
       map.set(s.key, {
         key: s.key,
-        label: s.label || s.key,
+        // Normalize through the canonical map — backend labels vary between
+        // raw keys and str.capitalize() ("Chatgpt") depending on cache age.
+        label: platformLabel(s.key),
         count: s.artifacts,
         color: s.color || FALLBACK_SOURCE_COLOR,
         summary: s.topInsight || undefined,
@@ -85,11 +90,12 @@ export function ComparisonView({ scope }: { scope: Scope }) {
   return (
     <>
       <SectionHead
+        icon="columns-3"
         title="Comparison"
         small="How your sources agree, conflict, and go silent"
         right={
-          <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
-            {totalCaptures} captures · {sources.length} source
+          <span className="font-sans text-[10.5px] uppercase tracking-[0.08em] tabular-nums text-fg-muted">
+            <CountUp value={totalCaptures} /> captures · <CountUp value={sources.length} /> source
             {sources.length === 1 ? "" : "s"}
           </span>
         }
@@ -119,11 +125,31 @@ export function ComparisonView({ scope }: { scope: Scope }) {
             <SourceCard key={s.key} source={s} color={s.color} />
           ))}
         </div>
+      ) : dashboard.isLoading ? (
+        // Source-card-shaped skeletons — same grid the real cards land in.
+        <div
+          className="grid gap-3.5 mobile:grid-cols-1"
+          style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-3 rounded-panel border border-border bg-bg p-[18px]">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-14" />
+              </div>
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-5/6" />
+              <div className="mt-2 flex flex-col gap-2.5">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-11/12" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="rounded-lg border border-border bg-bg p-8 text-center text-[13px] text-fg-subtle">
-          {dashboard.isLoading
-            ? "Loading comparison…"
-            : "Not enough captures yet to compare sources."}
+        <div className="rounded-panel border border-border bg-bg p-8 text-center text-[13px] text-fg-subtle">
+          Not enough captures yet to compare sources.
         </div>
       )}
 

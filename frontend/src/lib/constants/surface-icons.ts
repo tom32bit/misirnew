@@ -16,6 +16,32 @@ const AI_PLATFORMS: PlatformType[] = [
   "kimi",
 ]
 
+/**
+ * Canonical display names for platform keys. The backend emits raw keys
+ * (`chatgpt`) or `str.capitalize()` labels (`Chatgpt`) depending on the field
+ * and cache age — every surface must render through this map instead so the
+ * same platform never shows up spelled three ways.
+ */
+const PLATFORM_LABELS: Record<string, string> = {
+  web: "Web",
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+  perplexity: "Perplexity",
+  deepseek: "DeepSeek",
+  grok: "Grok",
+  copilot: "Copilot",
+  notebooklm: "NotebookLM",
+  kimi: "Kimi",
+  youtube: "YouTube",
+}
+
+export function platformLabel(key?: string | null): string {
+  const k = (key ?? "").trim().replace(/:$/, "").toLowerCase()
+  if (!k) return "—"
+  return PLATFORM_LABELS[k] ?? k.charAt(0).toUpperCase() + k.slice(1)
+}
+
 export function surfaceIcon(a: Artifact | { platform?: string; domain?: string | null; url?: string }): string {
   const platform = (a.platform ?? "").toLowerCase()
   const domain = (a.domain ?? "").toLowerCase()

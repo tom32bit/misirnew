@@ -1,7 +1,9 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { motion } from "motion/react"
 import { cn } from "@/lib/utils"
+import { SPRING } from "@/lib/motion"
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -12,7 +14,9 @@ const TABS = [
 ] as const
 
 // Claude-style segmented control: a sunken track with the active tab as a
-// raised, softly-shadowed chip (replaces the underline-tab pattern).
+// raised chip. The chip is a shared-layout pill (same language as the
+// Sidebar's) that glides between tabs; its elevation comes from a hairline
+// border + token shadow so it reads correctly in both themes.
 export function SpaceTabNav() {
   const params = useParams<{ scope?: string; view?: string }>()
   const router = useRouter()
@@ -33,14 +37,20 @@ export function SpaceTabNav() {
               type="button"
               onClick={() => router.push(`/dashboard/${scope}/${tab.id}`)}
               className={cn(
-                "rounded-[9px] px-3.5 py-[7px] text-[13px] font-medium transition-colors duration-150",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
-                active
-                  ? "bg-bg-muted text-fg shadow-[0_1px_2px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.05)]"
-                  : "text-fg-subtle hover:text-fg-muted",
+                "relative rounded-[9px] px-3.5 py-[7px] text-[13px] font-medium transition-colors duration-150",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
+                active ? "text-fg" : "text-fg-subtle hover:text-fg-muted",
               )}
             >
-              {tab.label}
+              {active && (
+                <motion.span
+                  layoutId="spacetab-active"
+                  transition={SPRING.snap}
+                  aria-hidden
+                  className="absolute inset-0 rounded-[9px] border border-border bg-bg shadow-[var(--shadow-sm)]"
+                />
+              )}
+              <span className="relative">{tab.label}</span>
             </button>
           )
         })}

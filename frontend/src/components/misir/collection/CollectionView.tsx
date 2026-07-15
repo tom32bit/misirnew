@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Icon } from "@/components/misir/primitives/Icon"
 import {
   Card,
@@ -21,6 +23,8 @@ import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useSubspaces } from "@/lib/hooks/useSubspaces"
 import { usePeriodParams } from "@/lib/hooks/usePeriodParams"
 import { adaptCaptures, type CaptureVM } from "@/lib/api/capture-adapters"
+import { undoableAction } from "@/lib/undoable"
+import type { Artifact } from "@/lib/api/types"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import { getSubspaceColor } from "@/lib/constants/subspace-colors"
 import type { PlatformType, Space, Subspace } from "@/lib/api/types"
@@ -112,6 +116,29 @@ export function CollectionView({ scope }: { scope: Scope }) {
   }
   const artifacts = useArtifacts(artifactOpts)
   const deleteArtifact = useDeleteArtifact(artifactOpts)
+  const qc = useQueryClient()
+
+  // House destructive pattern: remove from the cache instantly, offer Undo,
+  // and only hit the API once the toast closes un-undone.
+  const handleDelete = (id: string) => {
+    const idNum = Number(id)
+    const cap = captures.find((c) => c.id === id)
+    qc.setQueryData<Artifact[]>(["artifacts", artifactOpts], (old) =>
+      old?.filter((a) => a.id !== idNum),
+    )
+    undoableAction({
+      message: "Capture deleted",
+      description: cap?.title,
+      onUndo: () => qc.invalidateQueries({ queryKey: ["artifacts", artifactOpts] }),
+      onCommit: () =>
+        deleteArtifact.mutate(idNum, {
+          onError: () => {
+            toast.error("Delete failed", { description: "The capture was restored." })
+            qc.invalidateQueries({ queryKey: ["artifacts", artifactOpts] })
+          },
+        }),
+    })
+  }
 
   const captures = useMemo(
     () => adaptCaptures(artifacts.data ?? [], new Date(), subspaces.data ?? []),
@@ -165,6 +192,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
   return (
     <>
       <SectionHead
+        icon="library"
         title="Collection"
         small="Everything the extension captured"
         right={
@@ -262,7 +290,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
               spaces={spaces}
               subspaces={subspaces.data ?? []}
               isAll={isAll}
-              onDelete={(id) => deleteArtifact.mutate(Number(id))}
+              onDelete={handleDelete}
             />
           ))
         )}
@@ -344,7 +372,6 @@ function CaptureRow({
   isAll: boolean
   onDelete: (id: string) => void
 }) {
-  const [confirming, setConfirming] = useState(false)
   const subspaceColor = subspace ? getSubspaceColor(subspace) : undefined
   const spaceColor = space ? getSpaceColor(space) : undefined
 
@@ -379,30 +406,14 @@ function CaptureRow({
         )}
       </div>
       <div className="flex items-center gap-1">
-        {confirming ? (
-          <>
-            <button
-              onClick={() => { onDelete(capture.id); setConfirming(false) }}
-              className="rounded px-2 py-0.5 text-[11px] font-medium text-white bg-[var(--color-danger)] hover:opacity-90"
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => setConfirming(false)}
-              className="rounded px-2 py-0.5 text-[11px] text-fg-muted hover:text-fg"
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => setConfirming(true)}
-            className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint transition-opacity hover:text-[var(--color-danger)]"
-            aria-label="Delete capture"
-          >
-            <Icon name="trash-2" size={13} />
-          </button>
-        )}
+        {/* No confirm step — deletion is optimistic and undoable via toast. */}
+        <button
+          onClick={() => onDelete(capture.id)}
+          className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint transition-opacity hover:text-[var(--color-danger)]"
+          aria-label="Delete capture"
+        >
+          <Icon name="trash-2" size={13} />
+        </button>
       </div>
     </div>
   )

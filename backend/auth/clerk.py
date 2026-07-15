@@ -61,6 +61,11 @@ class CurrentUser:
 _jwks_cache: Optional[dict] = None
 _jwks_fetched_at: float = 0.0
 _JWKS_TTL_SECONDS = 3600
+# Unknown-kid tokens force a refresh (key rotation) — but at most once per
+# cooldown window, or a flood of garbage tokens turns the API into a
+# JWKS-hammering client (cache-bust DoS amplification).
+_jwks_last_forced: float = -10_000.0
+_JWKS_FORCE_COOLDOWN_SECONDS = 60.0
 
 
 async def _get_jwks() -> dict:
@@ -110,14 +115,18 @@ async def _verify_clerk_jwt(token: str) -> CurrentUser:
             break
 
     if matching_key is None:
-        # Force JWKS refresh on unknown kid (key rotation)
-        global _jwks_fetched_at
-        _jwks_fetched_at = 0.0
-        jwks = await _get_jwks()
-        for key_data in jwks.get("keys", []):
-            if key_data.get("kid") == kid:
-                matching_key = key_data
-                break
+        # Force JWKS refresh on unknown kid (key rotation) — rate-limited so
+        # unauthenticated garbage tokens can't bust the cache on every request.
+        global _jwks_fetched_at, _jwks_last_forced
+        now = time.monotonic()
+        if (now - _jwks_last_forced) >= _JWKS_FORCE_COOLDOWN_SECONDS:
+            _jwks_last_forced = now
+            _jwks_fetched_at = 0.0
+            jwks = await _get_jwks()
+            for key_data in jwks.get("keys", []):
+                if key_data.get("kid") == kid:
+                    matching_key = key_data
+                    break
 
     if matching_key is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown signing key")

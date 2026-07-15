@@ -270,7 +270,7 @@ function Section({
   return (
     <div
       className={[
-        "rounded-xl border bg-bg-subtle",
+        "rounded-panel border bg-bg-subtle",
         danger
           ? "border-[color-mix(in_srgb,var(--color-danger)_30%,var(--border))]"
           : "border-border",
@@ -325,9 +325,12 @@ function SpaceSettings({ spaceId }: { spaceId: number }) {
     (name.trim() !== (space.data.name ?? "") ||
       goal.trim() !== (space.data.goal ?? ""))
 
-  const deadlineDirty =
-    !deadline.isLoading &&
-    dueDate?.toISOString() !== (deadline.data?.due_at ?? undefined)
+  // Compare as epoch ms, not strings — the stored due_at's ISO format
+  // (offset style, ms precision) differs from Date#toISOString output, so a
+  // string comparison misreports dirty for identical instants.
+  const storedDueMs = deadline.data?.due_at ? Date.parse(deadline.data.due_at) : null
+  const draftDueMs = dueDate ? dueDate.getTime() : null
+  const deadlineDirty = !deadline.isLoading && draftDueMs !== storedDueMs
 
   const saveGeneral = async () => {
     if (!name.trim()) return

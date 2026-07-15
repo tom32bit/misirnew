@@ -116,8 +116,9 @@ def update_gap(space_id: int, gap_id: int, body: GapUpdate, current_user: Curren
                 }).eq("id", n["id"]).execute()
 
         # Insert a "gap resolved" success nudge
-        space_row = db.schema("misir").table("space").select("name").eq("id", space_id).single().execute()
-        space_name = (space_row.data or {}).get("name", "your research")
+        # No .single() — supabase-py raises APIError on 0 rows.
+        space_row = db.schema("misir").table("space").select("name").eq("id", space_id).limit(1).execute()
+        space_name = (space_row.data[0] if space_row.data else {}).get("name", "your research")
         db.schema("misir").table("nudge").insert({
             "user_id": user_id,
             "space_id": space_id,

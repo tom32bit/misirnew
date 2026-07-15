@@ -44,6 +44,7 @@ function DecisionAll() {
   return (
     <>
       <SectionHead
+        icon="git-branch"
         title="Decision tree"
         small="Readiness across all spaces"
       />
@@ -72,6 +73,7 @@ function DecisionAll() {
       {effectiveId != null && (
         <>
           <SectionHead
+            icon="microscope"
             title="Detailed view"
             small={spaces.find((x) => x.id === effectiveId)?.name ?? ""}
             right={
@@ -142,7 +144,7 @@ function SpaceDecisionCard({
           onSelect()
         }
       }}
-      className="flex cursor-pointer flex-col gap-3 rounded-lg border border-border bg-bg p-4 transition-shadow hover:shadow-sm"
+      className="flex cursor-pointer flex-col gap-3 rounded-panel border border-border bg-bg p-4 transition-shadow hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
       style={{ borderTop: `4px solid ${color}` }}
     >
       <div>
@@ -220,7 +222,7 @@ function DecisionBody({ spaceId }: { spaceId: number }) {
     return (
       <>
         <DecisionEmpty loading={dashboard.isLoading} readiness={readiness} />
-        <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} />
+        <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} loading={gaps.isLoading} />
       </>
     )
   }
@@ -235,15 +237,18 @@ function DecisionBody({ spaceId }: { spaceId: number }) {
 
   return (
     <>
+      {/* No per-option readiness: the backend only reports space-wide coverage,
+          and pretending it's per-option (A = overall, B = 0%) misleads. The
+          hero's coverage strip carries the real figure. */}
       <DecisionHero
         question={question}
-        optionA={{ ...optionA, readiness }}
-        optionB={{ ...optionB, readiness: 0 }}
+        optionA={optionA}
+        optionB={optionB}
         readiness={readiness}
         deadline={deadline.data ?? null}
       />
       <ProConGrid pros={backendDec.option_a.pros} cons={backendDec.option_a.cons} />
-      <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} />
+      <KnowledgeGaps spaceId={spaceId} gaps={gaps.data ?? []} loading={gaps.isLoading} />
       <ChatCTA
         title={ask}
         hint="Misir uses your captures + subspace context to answer."

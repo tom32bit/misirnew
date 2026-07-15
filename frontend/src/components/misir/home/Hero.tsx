@@ -1,23 +1,26 @@
 "use client"
 
 import Link from "next/link"
+import { motion, useReducedMotion } from "motion/react"
 import { Icon } from "@/components/misir/primitives/Icon"
 import { ReadinessRing } from "@/components/misir/primitives/ReadinessRing"
 import { getSpaceColor } from "@/lib/constants/space-colors"
+import { SPRING } from "@/lib/motion"
 import type { SpaceVM } from "./HomeAll"
 
-function greeting(): string {
+/** next/link with motion props (hover lift, tap, entrance). */
+const MotionLink = motion.create(Link)
+
+function greeting(): { text: string; icon: string } {
   const h = new Date().getHours()
-  if (h < 12) return "Good morning"
-  if (h < 17) return "Good afternoon"
-  return "Good evening"
+  if (h < 12) return { text: "Good morning", icon: "sunrise" }
+  if (h < 17) return { text: "Good afternoon", icon: "sun" }
+  return { text: "Good evening", icon: "moon" }
 }
 
 type Moment = { lines: string[]; cta: string; href: string }
 
 function buildMoment(vms: SpaceVM[], totalCaptures: number, totalCritical: number): Moment {
-  const ACCENT = "#FF6C3C"
-
   if (totalCaptures === 0) {
     return {
       lines: [
@@ -85,41 +88,59 @@ export function Hero({
 
   return (
     <section
-      className="grid gap-8 rounded-xl border border-border bg-bg p-8 mobile:grid-cols-1 mobile:gap-5 mobile:p-4"
+      className="grid gap-8 rounded-panel border border-border bg-bg p-8 mobile:grid-cols-1 mobile:gap-5 mobile:p-4"
       style={{ gridTemplateColumns: "minmax(0,1fr) 260px" }}
     >
       <div className="min-w-0">
-        <div className="mb-[18px] font-mono text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
-          {greeting()}, {userName}.
+        <div className="mb-[18px] flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
+          <Icon name={greeting().icon} size={12} className="flex-none" />
+          {greeting().text}, {userName}.
         </div>
 
         <div className="mb-[22px] flex flex-col gap-0.5">
+          {/* Keyed by index (not text) so the stagger plays once on mount and
+              a loading→loaded text swap doesn't re-trigger it. */}
           {moment.lines.map((line, i) => (
-            <span
+            <motion.span
               key={i}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...SPRING.smooth, delay: 0.04 + i * 0.07 }}
               className="block font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-fg mobile:text-[22px]"
-              style={i === 2 ? { color: "#FF6C3C", fontStyle: "italic" } : undefined}
+              style={i === 2 ? { color: "var(--color-accent)", fontStyle: "italic" } : undefined}
             >
               {line}
-            </span>
+            </motion.span>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <Link
+          <MotionLink
             href={moment.href}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            transition={SPRING.snap}
             className="inline-flex h-[30px] items-center gap-1.5 rounded-md border bg-transparent px-3.5 text-[12.5px] font-medium transition-colors hover:bg-bg-muted"
             style={{
-              color: "#FF6C3C",
-              borderColor: "color-mix(in srgb, #FF6C3C 30%, transparent)",
+              color: "var(--color-accent)",
+              borderColor: "color-mix(in srgb, var(--color-accent) 30%, transparent)",
             }}
           >
             {moment.cta}
             <Icon name="arrow-right" size={12} />
-          </Link>
-          <span className="font-mono text-[10.5px] tracking-wide text-fg-subtle">
-            {totalCaptures} capture{totalCaptures === 1 ? "" : "s"} · {totalCritical} critical gap
-            {totalCritical === 1 ? "" : "s"}
+          </MotionLink>
+          <span className="flex items-center gap-3 font-mono text-[10.5px] tracking-wide text-fg-subtle">
+            <span className="inline-flex items-center gap-1">
+              <Icon name="bookmark" size={11} />
+              {totalCaptures} capture{totalCaptures === 1 ? "" : "s"}
+            </span>
+            <span
+              className="inline-flex items-center gap-1"
+              style={totalCritical > 0 ? { color: "var(--color-danger)" } : undefined}
+            >
+              <Icon name="triangle-alert" size={11} />
+              {totalCritical} critical gap{totalCritical === 1 ? "" : "s"}
+            </span>
           </span>
         </div>
 
@@ -148,6 +169,7 @@ export function Hero({
  * dates it hides itself rather than fake a chart.
  */
 function CaptureRhythm({ vms }: { vms: SpaceVM[] }) {
+  const reduceMotion = useReducedMotion()
   const DAYS = 14
   const counts = new Array(DAYS).fill(0)
   const now = new Date()
@@ -173,7 +195,10 @@ function CaptureRhythm({ vms }: { vms: SpaceVM[] }) {
   return (
     <div className="mt-[34px] border-t border-border pt-6">
       <div className="mb-3.5 flex items-baseline justify-between">
-        <span className="font-serif text-[14px] text-fg-muted">Capture rhythm</span>
+        <span className="inline-flex items-center gap-1.5 font-serif text-[14px] text-fg-muted">
+          <Icon name="activity" size={12} className="flex-none" />
+          Capture rhythm
+        </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-subtle">
           Last {DAYS} days
         </span>
@@ -183,15 +208,14 @@ function CaptureRhythm({ vms }: { vms: SpaceVM[] }) {
           const h = c === 0 ? 3 : 8 + (c / max) * 44
           const isToday = i === DAYS - 1
           return (
-            <div
+            <motion.div
               key={i}
               title={`${c} capture${c === 1 ? "" : "s"}`}
               className="flex-1 rounded-[3px]"
-              style={{
-                height: h,
-                background: c === 0 ? "var(--border-strong)" : "#FF6C3C",
-                opacity: c === 0 ? 0.45 : isToday ? 1 : 0.85,
-              }}
+              initial={reduceMotion ? false : { height: 3, opacity: 0.3 }}
+              animate={{ height: h, opacity: c === 0 ? 0.45 : isToday ? 1 : 0.85 }}
+              transition={{ ...SPRING.smooth, delay: i * 0.018 }}
+              style={{ background: c === 0 ? "var(--border-strong)" : "var(--color-accent)" }}
             />
           )
         })}
@@ -210,11 +234,11 @@ function CaptureRhythm({ vms }: { vms: SpaceVM[] }) {
  * spaces are just seeds and which are maturing.
  */
 function readinessTier(pct: number): { label: string; color: string } {
-  if (pct <= 0) return { label: "Just started", color: "#8A857B" }
-  if (pct < 15) return { label: "Seedling", color: "#B8730D" }
-  if (pct < 30) return { label: "Building", color: "#FF6C3C" }
-  if (pct < 60) return { label: "On track", color: "#2E7D55" }
-  return { label: "Ready", color: "#2E7D55" }
+  if (pct <= 0) return { label: "Just started", color: "var(--fg-faint)" }
+  if (pct < 15) return { label: "Seedling", color: "var(--color-warning)" }
+  if (pct < 30) return { label: "Building", color: "var(--color-accent)" }
+  if (pct < 60) return { label: "On track", color: "var(--color-success)" }
+  return { label: "Ready", color: "var(--color-success)" }
 }
 
 function SpaceRingButton({ vm }: { vm: SpaceVM }) {
@@ -225,8 +249,11 @@ function SpaceRingButton({ vm }: { vm: SpaceVM }) {
   const ringColor = hasCritical ? getSpaceColor(vm.space) : tier.color
 
   return (
-    <Link
+    <MotionLink
       href={`/dashboard/${vm.space.id}/home`}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={SPRING.snap}
       className="group flex items-center gap-3 rounded-lg border border-border bg-bg-subtle px-3.5 py-2.5 text-left transition-colors hover:bg-bg-muted mobile:flex-1 mobile:min-w-[140px]"
       style={{ ["--sc" as string]: ringColor }}
     >
@@ -261,6 +288,6 @@ function SpaceRingButton({ vm }: { vm: SpaceVM }) {
           {vm.capturesWeek}
         </span>
       )}
-    </Link>
+    </MotionLink>
   )
 }

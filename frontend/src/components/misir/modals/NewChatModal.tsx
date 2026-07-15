@@ -2,18 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight } from "lucide-react"
 import { toast } from "sonner"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogBody,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-  DialogCloseButton,
-} from "@/components/ui/dialog"
+import { ModalShell, ModalHead, ModalBody, ModalFoot } from "./ModalShell"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Icon } from "@/components/misir/primitives/Icon"
@@ -21,6 +11,7 @@ import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useApi } from "@/lib/api/client"
 import { chatApi } from "@/lib/api/chat"
 import { useQueryClient } from "@tanstack/react-query"
+import { useUIStore } from "@/lib/stores/ui-store"
 
 const PROMPTS = [
   "What's the single biggest gap before my next deadline?",
@@ -42,6 +33,7 @@ export function NewChatModal({
   const qc = useQueryClient()
   const k = useApi()
   const { data: spaces = [] } = useSpaces()
+  const openModal = useUIStore((s) => s.openModal)
   const ta = useRef<HTMLTextAreaElement>(null)
 
   const [spaceId, setSpaceId] = useState<number | undefined>(defaultSpaceId)
@@ -91,26 +83,33 @@ export function NewChatModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex-1">
-            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-muted">
-              New chat
-            </div>
-            <DialogTitle>Ask Misir.</DialogTitle>
-            <DialogDescription className="mt-1">
-              Misir reads your captures and subspaces before answering.
-            </DialogDescription>
-          </div>
-          <DialogCloseButton />
-        </DialogHeader>
+    <ModalShell open={open} onClose={onClose} ariaLabel="New chat">
+      <ModalHead
+        eyebrow="New chat"
+        title="Ask Misir."
+        sub="Misir reads your captures and subspaces before answering."
+        onClose={onClose}
+      />
 
-        <DialogBody>
+      <ModalBody>
           <label className="flex flex-col gap-1.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-fg-muted">
               In space
             </span>
+            {/* Zero spaces is a dead end without this — offer the way out. */}
+            {spaces.length === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  openModal({ kind: "new-space" })
+                }}
+                className="flex items-center gap-2 rounded-md border border-dashed border-border-strong bg-bg-subtle px-3 py-2.5 text-left text-[12.5px] text-fg-muted transition-colors hover:border-accent hover:text-fg"
+              >
+                <Icon name="plus" size={12} />
+                You don&apos;t have a space yet — create one first
+              </button>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {spaces.map((s) => {
                 const active = spaceId === s.id
@@ -170,15 +169,16 @@ export function NewChatModal({
               ))}
             </div>
           </div>
-        </DialogBody>
+      </ModalBody>
 
-        <DialogFooter>
-          <div className="text-[11.5px] text-fg-subtle">
-            {spaceId
-              ? `Sending to ${spaces.find((s) => s.id === spaceId)?.name}`
-              : "Pick a space first"}
-          </div>
-          <div className="flex items-center gap-2">
+      <ModalFoot
+        left={
+          spaceId
+            ? `Sending to ${spaces.find((s) => s.id === spaceId)?.name}`
+            : "Pick a space first"
+        }
+        right={
+          <>
             <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
             </Button>
@@ -189,11 +189,11 @@ export function NewChatModal({
               disabled={!draft.trim() || !spaceId || submitting}
             >
               {submitting ? "Starting…" : "Send"}
-              <ArrowRight size={12} />
+              <Icon name="arrow-right" size={12} />
             </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </>
+        }
+      />
+    </ModalShell>
   )
 }

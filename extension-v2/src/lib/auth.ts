@@ -15,17 +15,16 @@ export async function cacheClerkToken(token: string): Promise<void> {
     return
   }
 
-  try {
-    // Parse JWT to get expiry
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    const expiry = (payload.exp * 1000) - EXPIRY_BUFFER_MS
-
+  // Parse the JWT for its expiry via the base64url-safe decoder — plain atob
+  // chokes on payloads containing '-'/'_' and silently dropped the expiry.
+  const exp = decodeJwtExp(token)
+  if (exp != null) {
     await chrome.storage.session.set({
       [TOKEN_KEY]: token,
-      [TOKEN_EXPIRY_KEY]: expiry,
+      [TOKEN_EXPIRY_KEY]: exp * 1000 - EXPIRY_BUFFER_MS,
     })
-  } catch {
-    // If parsing fails, just store token without expiry
+  } else {
+    // Unparseable exp — store the token without one.
     await chrome.storage.session.set({ [TOKEN_KEY]: token })
   }
 }
@@ -110,28 +109,4 @@ export async function getCachedClerkToken(): Promise<string | null> {
 
 export async function clearClerkToken(): Promise<void> {
   await chrome.storage.session.remove([TOKEN_KEY, TOKEN_EXPIRY_KEY])
-}
-
-/**
- * Get token from Clerk's popup/auth flow
- * This is called when user signs in via the popup
- */
-export async function getTokenFromClerk(): Promise<string | null> {
-  // The frontend will postMessage the token after sign-in
-  // We listen for it here
-  return new Promise((resolve) => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === 'CLERK_TOKEN' && event.data.token) {
-        window.removeEventListener('message', handler)
-        resolve(event.data.token)
-      }
-    }
-    window.addEventListener('message', handler)
-
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', handler)
-      resolve(null)
-    }, 30000)
-  })
 }

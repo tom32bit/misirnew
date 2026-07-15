@@ -103,8 +103,10 @@ export function PopupApp() {
     const id = setInterval(() => {
       chrome.runtime
         .sendMessage({ type: 'GET_AUTH_STATE' })
-        .then((r: { signedIn?: boolean } | undefined) => {
-          if (r && typeof r.signedIn === 'boolean') setSignedIn(r.signedIn)
+        .then((r: { signedIn?: boolean; known?: boolean } | undefined) => {
+          // Only act on a DEFINITIVE answer — known:false means the probe
+          // couldn't reach the backend (offline), not a sign-in change.
+          if (r && r.known && typeof r.signedIn === 'boolean') setSignedIn(r.signedIn)
         })
         .catch(() => {})
     }, 3000)
@@ -242,11 +244,13 @@ export function PopupApp() {
       await loadFailedSaves()
 
       // Auth: default to "signed in" if the SW doesn't answer, so we don't nag
-      // during a slow wake-up — only prompt when we KNOW there's no session.
+      // during a slow wake-up — only prompt when we KNOW there's no session
+      // (known:true + signedIn:false). known:false = offline/unreachable, which
+      // is NOT a sign-in problem, so it never triggers the prompt.
       const auth = (await chrome.runtime
         .sendMessage({ type: 'GET_AUTH_STATE' })
-        .catch(() => ({ signedIn: true }))) as { signedIn?: boolean }
-      setSignedIn(auth?.signedIn !== false)
+        .catch(() => ({ signedIn: true, known: false }))) as { signedIn?: boolean; known?: boolean }
+      setSignedIn(!(auth?.known && auth?.signedIn === false))
       try {
         await apiGetConsent()
       } catch {

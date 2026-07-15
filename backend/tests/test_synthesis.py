@@ -204,7 +204,8 @@ def stage_a_db(monkeypatch):
                                     "platform": "web", "engagement_level": "active", "base_weight": 2.0,
                                     "captured_at": "2026-07-01T00:00:00+00:00", "matched_marker_ids": []}]),
         "gap": FakeResp(data=[]),
-        "space": FakeResp(data={"name": "Series A", "goal": "Raise", "description": ""}),
+        # List shape — the space lookup uses .limit(1) + data[0], not .single().
+        "space": FakeResp(data=[{"name": "Series A", "goal": "Raise", "description": ""}]),
         "source_synthesis": FakeResp(data=[]),
     })
 

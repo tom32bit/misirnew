@@ -7,6 +7,8 @@ export type ModalState =
   | { kind: "new-space" }
   | { kind: "new-chat"; defaultSpaceId?: number }
   | { kind: "edit-space"; spaceId: number }
+  | { kind: "command" }
+  | { kind: "shortcuts" }
 
 type MisirAsksState = {
   expanded: boolean
@@ -48,6 +50,7 @@ type UIState = {
   dismissAsks(spaceId: number): void
 
   dismissNudge(nudgeId: number): void
+  restoreNudge(nudgeId: number): void
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -125,6 +128,13 @@ export const useUIStore = create<UIState>((set, get) => ({
     set((s) => {
       const next = new Set(s.nudgesDismissed)
       next.add(id)
+      return { nudgesDismissed: next }
+    }),
+
+  restoreNudge: (id) =>
+    set((s) => {
+      const next = new Set(s.nudgesDismissed)
+      next.delete(id)
       return { nudgesDismissed: next }
     }),
 }))

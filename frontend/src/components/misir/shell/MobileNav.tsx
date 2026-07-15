@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { motion } from "motion/react"
 import { Icon } from "@/components/misir/primitives/Icon"
+import { SPRING } from "@/lib/motion"
 import { useUnreadCounts } from "@/lib/hooks/useUnreadCounts"
 
 const ITEMS = [
@@ -36,10 +38,21 @@ export function MobileNav() {
               active ? "text-accent" : "text-fg-subtle",
             ].join(" ")}
           >
-            <Icon name={item.icon} size={20} />
+            {/* Same gliding-pill active language as the Sidebar/SpaceTabNav. */}
+            <span className="relative grid h-9 w-14 place-items-center rounded-full">
+              {active && (
+                <motion.span
+                  layoutId="mobilenav-active"
+                  transition={SPRING.snap}
+                  aria-hidden
+                  className="absolute inset-0 rounded-full bg-[var(--bg-active)]"
+                />
+              )}
+              <Icon name={item.icon} size={20} className="relative" />
+            </span>
             {count > 0 && (
               <span
-                className="absolute top-2 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-accent px-1 font-mono text-[9px] font-semibold leading-none text-white"
+                className="absolute top-2 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-accent px-1 font-mono text-[9px] font-semibold leading-none text-fg-on-accent"
                 style={{ right: "calc(50% - 18px)" }}
               >
                 {count}

@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { ProgressBar } from "@/components/misir/primitives/Card"
+import { CountUp } from "@/components/misir/primitives/CountUp"
 import { getSpaceColor } from "@/lib/constants/space-colors"
 import type { SpaceVM } from "./HomeAll"
 
@@ -22,7 +24,7 @@ function SpacePulseCard({ vm }: { vm: SpaceVM }) {
   return (
     <Link
       href={`/dashboard/${vm.space.id}/home`}
-      className="flex flex-col gap-2 rounded-lg border border-border bg-bg px-4 py-3.5 text-left transition-colors hover:bg-bg-subtle"
+      className="flex flex-col gap-2 rounded-panel border border-border bg-bg px-4 py-3.5 text-left transition-colors hover:bg-bg-subtle"
       style={{
         ["--sc" as string]: color,
         borderColor: undefined,
@@ -38,25 +40,22 @@ function SpacePulseCard({ vm }: { vm: SpaceVM }) {
         </span>
         {vm.criticalGaps > 0 && (
           <span
-            className="flex-none rounded-sm bg-[rgba(255,108,60,0.12)] px-1.5 py-px font-mono text-[10px] font-semibold text-accent"
+            className="flex-none rounded-sm bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] px-1.5 py-px font-mono text-[10px] font-semibold text-accent"
           >
             {vm.criticalGaps}
           </span>
         )}
       </div>
 
-      <div className="h-[3px] w-full overflow-hidden rounded-[3px] bg-border-strong">
-        <div
-          className="h-full rounded-[inherit] transition-[width] duration-[400ms] ease-out"
-          style={{ width: `${vm.readiness}%`, background: color }}
-        />
-      </div>
+      <ProgressBar value={vm.readiness} color={color} />
 
-      <div className="flex items-center gap-1.5 font-mono text-[10.5px] text-fg-muted">
+      <div className="flex items-center gap-1.5 font-mono text-[10.5px] tabular-nums text-fg-muted">
         <span className="font-semibold" style={{ color }}>
-          {vm.readiness}%
+          <CountUp value={vm.readiness} suffix="%" />
         </span>
-        <span className="ml-auto">{vm.capturesWeek} cap</span>
+        <span className="ml-auto">
+          <CountUp value={vm.capturesWeek} /> cap
+        </span>
       </div>
     </Link>
   )

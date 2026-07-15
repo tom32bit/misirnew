@@ -1,5 +1,6 @@
 import ky from "ky"
 import { auth } from "@clerk/nextjs/server"
+import { API_URL } from "@/lib/env"
 
 /**
  * Server-side ky for use inside RSC, server actions, and route handlers.
@@ -10,7 +11,7 @@ export async function serverApi() {
   const token = await getToken()
 
   return ky.create({
-    prefixUrl: process.env.NEXT_PUBLIC_API_URL!,
+    prefixUrl: API_URL,
     timeout: 30_000,
     cache: "no-store",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
