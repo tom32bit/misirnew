@@ -308,7 +308,12 @@
     text-rendering: optimizeLegibility;
   }
 
-  body { overflow: hidden; }
+  /* No `body { overflow: hidden }` here. The app shell is fixed-height and
+     clips itself (DashboardShell is h-screen + overflow-hidden, scrolling in an
+     inner overflow-y-auto pane), so the document never scrolls on those routes
+     anyway. As a global it silently broke every ordinary page that IS meant to
+     scroll — the landing and /privacy. Any new fixed-viewport route should clip
+     itself the way the shell does rather than reach for the document. */
 
   button { font-family: inherit; cursor: pointer; }
 
