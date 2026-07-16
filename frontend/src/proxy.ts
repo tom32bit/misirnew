@@ -27,7 +27,7 @@ export const config = {
     // happened to the landing's end_hero.webm: images were excluded, video was
     // not. Media extensions are listed even when unused today so the next asset
     // dropped into public/ does not trip the same wire.
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ogv|mov|mp3|wav|ogg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ogv|mov|mp3|wav|ogg|ttf|otf|woff2?|eot|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 }
