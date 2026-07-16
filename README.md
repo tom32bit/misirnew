@@ -112,7 +112,8 @@ Defaults point at `http://localhost:8000` (backend) and `http://localhost:3000` 
 
 ```bash
 cd backend       && python -m pytest -q
-cd frontend      && npm test        # vitest + jsdom
+cd frontend      && npm test        # vitest + jsdom (unit)
+cd frontend      && npm run test:e2e # playwright — signed-out browser smoke (builds first)
 cd extension-v2  && npm test        # fast, offline (mocked embeddings)
 cd extension-v2  && npm run eval    # model-backed matching eval (~90 MB download)
 ```
@@ -126,7 +127,7 @@ Run `npm run eval` whenever you touch matching — it is deliberately **not** a 
 | Job | What it gates |
 |-----|---------------|
 | **Backend** | `pytest` |
-| **Frontend** | `eslint` + `vitest` + `next build`, which type-checks the project — all **blocking** |
+| **Frontend** | `eslint` + `vitest` + `next build` (type-checks the project); a separate **e2e** job runs Playwright against a production build — all **blocking** |
 | **Extension** | `vitest` + `npm run build`, which runs `tsc` first — type-checking **blocks** |
 
 > Modifying `.github/workflows/**` requires a token with the `workflow` scope.

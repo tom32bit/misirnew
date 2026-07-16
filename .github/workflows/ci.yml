@@ -65,6 +65,36 @@ jobs:
       # Next 16 has no standalone `typegen` command to sidestep that ordering.
       - run: npm run build
 
+  frontend-e2e:
+    name: Frontend (e2e smoke)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Same dummy value the build job uses. The Clerk fakes the e2e run needs
+      # live in playwright.config.ts's webServer.env, not here, because they must
+      # be present at build time (NEXT_PUBLIC_* is inlined) AND the config owns
+      # the build+start, so keeping them there is the single source of truth.
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # Chromium only (see playwright.config.ts). --with-deps pulls the system
+      # libraries the headless browser needs on a bare ubuntu runner.
+      - run: npx playwright install --with-deps chromium
+      # The config's webServer runs `next build && next start`, so this both
+      # builds the production bundle and drives it in a real browser. Guards what
+      # unit tests structurally cannot: that assets are served rather than 307'd
+      # (the webm/otf bugs), the video actually plays, and the signed-out CTAs
+      # reach Clerk.
+      - run: npm run test:e2e
+
   extension-v2:
     name: Extension (typecheck + tests + build)
     runs-on: ubuntu-latest
