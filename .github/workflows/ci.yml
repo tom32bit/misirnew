@@ -29,7 +29,7 @@ jobs:
       - run: python -m pytest -q
 
   frontend:
-    name: Frontend (lint + typecheck + build)
+    name: Frontend (lint + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,11 +49,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      # Blocking: the type debt this used to tolerate is paid off (0 errors), so
-      # the gate is closed to keep it that way.
-      - run: npx tsc --noEmit
-      # The build is what actually ships, and it type-checks the route graph that
-      # `tsc --noEmit` alone doesn't exercise (prerender, page data collection).
+      # Blocking type gate AND the bundle that ships. `next build` type-checks the
+      # whole tsconfig project (no typescript.ignoreBuildErrors in next.config.ts)
+      # — including files no route imports — so a separate `tsc --noEmit` adds
+      # nothing. It also cannot run first: `PageProps` is generated into
+      # .next/types/routes.d.ts by the build, and tsconfig includes that path, so
+      # tsc on a clean checkout fails with TS2304 before the build has emitted it.
+      # Next 16 has no standalone `typegen` command to sidestep that ordering.
       - run: npm run build
 
   extension-v2:

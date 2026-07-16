@@ -125,7 +125,7 @@ Run `npm run eval` whenever you touch matching — it is deliberately **not** a 
 | Job | What it gates |
 |-----|---------------|
 | **Backend** | `pytest` |
-| **Frontend** | `eslint` + `tsc` + `next build` — all **blocking** |
+| **Frontend** | `eslint` + `next build`, which type-checks the project — both **blocking** |
 | **Extension** | `vitest` + `npm run build`, which runs `tsc` first — type-checking **blocks** |
 
 > Modifying `.github/workflows/**` requires a token with the `workflow` scope.
