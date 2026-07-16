@@ -477,4 +477,62 @@ html:has(.landing) { scroll-behavior: smooth; }
     /* scroll-behavior is handled by the html:has(.landing) rule above —
        nested here it would resolve to `.landing html` and never match. */
   }
+
+  /* ── Install page ─────────────────────────────────────────────────────────
+     /install is reached straight from the landing nav, so it uses the same
+     ground rather than reading as a different site. Only the shapes the
+     marketing sections don't already provide are defined here; the header,
+     footer, .btn, .eyebrow, .h2 and .hero-note come from above. */
+
+  .install { max-width: 660px; margin: 0 auto; }
+
+  .install-lead {
+    margin-top: 14px; font-family: var(--font-serif);
+    font-size: 16px; line-height: 1.6; color: var(--fg-muted);
+  }
+  .install-lead b { color: var(--fg); font-weight: 600; }
+
+  .install-steps {
+    list-style: none; padding: 0; margin: 56px 0 0;
+    display: flex; flex-direction: column; gap: 26px;
+  }
+  .install-steps li { display: flex; gap: 16px; align-items: flex-start; }
+  .install-steps .n {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--font-mono); font-size: 11px;
+    background: var(--bg-muted); color: var(--fg-subtle);
+  }
+  .install-steps h2 {
+    font-family: var(--font-sans); font-size: 14.5px;
+    font-weight: 600; color: var(--fg);
+  }
+  .install-steps p {
+    margin-top: 5px; font-family: var(--font-serif);
+    font-size: 13.5px; line-height: 1.6; color: var(--fg-muted);
+  }
+  .install-steps code {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--bg-muted); border-radius: 4px; padding: 1px 5px;
+  }
+
+  .install-notes {
+    margin-top: 56px; padding: 22px;
+    display: flex; flex-direction: column; gap: 14px;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--bg-subtle);
+  }
+  .install-notes p {
+    font-family: var(--font-serif); font-size: 13px;
+    line-height: 1.6; color: var(--fg-muted);
+  }
+  .install-notes b { color: var(--fg); font-weight: 600; }
+
+  .install-legal {
+    margin-top: 30px; font-family: var(--font-serif);
+    font-size: 13px; color: var(--fg-muted);
+  }
+  .install-legal a {
+    color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
+  }
 }
