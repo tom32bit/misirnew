@@ -29,7 +29,7 @@ jobs:
       - run: python -m pytest -q
 
   frontend:
-    name: Frontend (lint + build)
+    name: Frontend (lint + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,6 +49,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # Vitest (jsdom). Runs before the build because it is ~4s and catches the
+      # class of bug the build cannot see: the build proves the app compiles,
+      # not that it behaves. Includes proxy.test.ts, which walks the real
+      # public/ directory and fails if an asset's extension is missing from the
+      # middleware matcher — the bug that made the landing video 307 to
+      # /sign-in, and the .otf fonts after it.
+      - run: npm test
       # Blocking type gate AND the bundle that ships. `next build` type-checks the
       # whole tsconfig project (no typescript.ignoreBuildErrors in next.config.ts)
       # — including files no route imports — so a separate `tsc --noEmit` adds
