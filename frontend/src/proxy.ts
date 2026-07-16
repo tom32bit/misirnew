@@ -19,7 +19,15 @@ export default clerkMiddleware(async (auth, req) => {
 export const config = {
   matcher: [
     // Run on every route except Next internals and static files.
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    //
+    // Every asset the landing serves to signed-out visitors must have its
+    // extension listed here. Anything missing is treated as a page, hits
+    // auth.protect() below, and 307s to /sign-in — so an <img>/<video> silently
+    // receives a redirect instead of bytes and just never renders. That is what
+    // happened to the landing's end_hero.webm: images were excluded, video was
+    // not. Media extensions are listed even when unused today so the next asset
+    // dropped into public/ does not trip the same wire.
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ogv|mov|mp3|wav|ogg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 }
