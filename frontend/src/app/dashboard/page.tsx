@@ -31,5 +31,5 @@ export default async function DashboardIndex() {
   }
 
   if (spaces.length === 0) redirect("/onboarding")
-  redirect(`/dashboard/${spaces[0].id}/overview`)
+  redirect("/dashboard/all/home")
 }
