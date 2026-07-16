@@ -100,7 +100,11 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
   }
 
   const handleLogout = () => {
-    signOut({ redirectUrl: "/sign-in" })
+    // "/" and not "/sign-in": signing out should land on the marketing page, not
+    // a login form inviting you straight back in. The session is gone by the time
+    // we get there, so the root route renders the landing rather than bouncing to
+    // the dashboard.
+    signOut({ redirectUrl: "/" })
   }
 
   return (
