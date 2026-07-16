@@ -29,11 +29,17 @@ jobs:
       - run: python -m pytest -q
 
   frontend:
-    name: Frontend (lint + typecheck)
+    name: Frontend (lint + typecheck + build)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
+    env:
+      # Dummy value so the build's module-scope env validation (src/lib/env.ts)
+      # passes. Nothing is fetched at build time — every route that talks to the
+      # API is dynamic — so the URL only has to exist, not resolve. This is the
+      # only var the build needs; Clerk keys are not read during prerender.
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,10 +49,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      # Type-check reported but non-blocking until pre-existing type debt is
-      # burned down (next build also type-checks what actually ships).
+      # Blocking: the type debt this used to tolerate is paid off (0 errors), so
+      # the gate is closed to keep it that way.
       - run: npx tsc --noEmit
-        continue-on-error: true
+      # The build is what actually ships, and it type-checks the route graph that
+      # `tsc --noEmit` alone doesn't exercise (prerender, page data collection).
+      - run: npm run build
 
   extension-v2:
     name: Extension (typecheck + tests + build)

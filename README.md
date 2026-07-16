@@ -58,12 +58,24 @@ Auth is **Clerk** across all three. Storage is **Supabase**; the backend uses th
 
 ```bash
 cd backend
-python -m venv .venv
+python -m venv .venv               # must be Python 3.12 — torch ships no 3.13+ wheels
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-local-embeddings.txt   # see EMBEDDING_PROVIDER below
 cp .env.example .env               # then fill it in — see below
-uvicorn main:app --reload --port 8000
+uvicorn main:app --port 8000
 ```
+
+`EMBEDDING_PROVIDER` defaults to `local`, which runs the model in-process and
+needs the torch stack — hence `requirements-local-embeddings.txt` above. Set
+`EMBEDDING_PROVIDER=nomic` (+ `NOMIC_API_KEY`) if you would rather call the
+hosted API, and `pip install -r requirements.txt` alone is enough.
+
+> **`--reload` is off by default here on purpose.** Uvicorn's reloader respawns
+> its child with the *base* interpreter on some setups, not the venv's. The child
+> then dies on import while still holding port 8000 — and because it never
+> listens, the port looks free to `netstat` while every restart fails to bind.
+> If you enable it, launch from an activated venv and check `python -c "import
+> sys; print(sys.executable)"` resolves inside `.venv` first.
 
 Required env (full list in [`backend/.env.example`](backend/.env.example)):
 
@@ -113,7 +125,7 @@ Run `npm run eval` whenever you touch matching — it is deliberately **not** a 
 | Job | What it gates |
 |-----|---------------|
 | **Backend** | `pytest` |
-| **Frontend** | `eslint` + `tsc` (type-check reported but **non-blocking** — pre-existing type debt) |
+| **Frontend** | `eslint` + `tsc` + `next build` — all **blocking** |
 | **Extension** | `vitest` + `npm run build`, which runs `tsc` first — type-checking **blocks** |
 
 > Modifying `.github/workflows/**` requires a token with the `workflow` scope.

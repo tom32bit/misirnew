@@ -14,3 +14,9 @@
 -r requirements.txt
 
 sentence-transformers==3.3.1
+
+# Required by nomic-embed-text-v1.5's remote modeling code. Not pulled in by
+# sentence-transformers, and the model only reaches for it at load time — so
+# without it the warm-up raises ImportError on a worker thread, /health stays
+# 200, and every embed fails. Pinned here so a fresh local install is whole.
+einops==0.8.2
