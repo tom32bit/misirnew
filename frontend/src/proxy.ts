@@ -5,6 +5,11 @@ const isPublic = createRouteMatcher([
   // page itself redirects signed-in users on to /dashboard. Not "/(.*)", which
   // would make the entire app public.
   "/",
+  // The install guide + its download redirect. Linked from the landing page, so
+  // signed-out visitors must reach both — auth-gating them would mean you had to
+  // sign in before you could install the thing that does the capturing.
+  "/install",
+  "/api/download(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",

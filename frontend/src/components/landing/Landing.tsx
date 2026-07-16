@@ -70,6 +70,7 @@ export function Landing() {
           <div className="nav-links">
             <a href="#how" className="quiet">How it works</a>
             <a href="#privacy" className="quiet">Privacy</a>
+            <Link href="/install" className="quiet">Install</Link>
             <Link href="/sign-in" className="quiet">Sign in</Link>
             <Link href="/sign-up" className="btn btn-primary sm">Join the beta</Link>
             <button
@@ -88,6 +89,7 @@ export function Landing() {
           <div className="wrap" onClick={() => setMenuOpen(false)}>
             <a href="#how">How it works</a>
             <a href="#privacy">Privacy</a>
+            <Link href="/install">Install</Link>
             <Link href="/sign-in">Sign in</Link>
           </div>
         </div>
