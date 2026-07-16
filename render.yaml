@@ -43,6 +43,16 @@ services:
       - key: NOMIC_API_KEY
         sync: false
 
+      # ── CORS — REQUIRED in production ────────────────────────────────────
+      # config.py's defaults are localhost-only; without the deployed frontend
+      # origin here the web app cannot reach this API. Set it in the dashboard
+      # once Vercel gives you a domain, as a JSON array:
+      #   ["https://your-app.vercel.app"]
+      # The extension needs NO entry — its service worker fetches with
+      # host_permissions, which bypasses CORS.
+      - key: CORS_ORIGINS
+        sync: false
+
       # ── Required services ────────────────────────────────────────────────
       - key: SUPABASE_URL
         sync: false
