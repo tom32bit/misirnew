@@ -40,6 +40,16 @@ const CLERK_ENV = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_Y2xlcmsuZXhhbXBsZS5jb20k",
   CLERK_SECRET_KEY: "sk_live_ci-smoke-fake-not-a-real-secret-do-not-scan",
   NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1",
+  // These MUST be set explicitly, not inherited from .env.local. A pk_live
+  // instance defaults auth.protect() to redirecting a signed-out user to
+  // Clerk's hosted account portal (accounts.<domain>) — here the fake
+  // accounts.example.com, which does not resolve, so `/dashboard` navigation
+  // dies with ERR_NAME_NOT_RESOLVED instead of landing on /sign-in. Pinning the
+  // routes keeps the redirect same-origin. (Locally this passed only because
+  // `next build` reads .env.local off disk, which CI has not — the leak that
+  // hid this until CI ran.)
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
 }
 
 export default defineConfig({
