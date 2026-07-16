@@ -16,6 +16,15 @@ from infrastructure.services.supabase_client import get_supabase
 logger = get_logger(__name__)
 settings = get_settings()
 
+# Titling budget. Reasoning models burn tokens on hidden chain-of-thought
+# before the first visible token, so this has to cover the thinking too. The
+# old value of 20 always truncated mid-thought (finish_reason="length") and
+# returned "" — measured: 256 still truncates on vaguer prompts, 512 lands.
+# The title itself is ~8 tokens; the rest is headroom for the thinking.
+TITLE_MAX_TOKENS = 512
+TITLE_MAX_CHARS = 70
+
+
 class ChatStreamError(Exception):
     """Raised when the chat stream cannot run/complete. The message is
     USER-SAFE — it is sent to the client verbatim in an SSE error frame;
@@ -157,21 +166,62 @@ async def stream_chat_response(
         raise ChatStreamError("Misir couldn't finish that reply. Try again.") from exc
 
 
+def fallback_title(user_message: str) -> str:
+    """A readable title derived from the user's own words.
+
+    Used whenever the model can't supply one. Never returns "" — an empty
+    title reads as a bug in the inbox, so fall back to a fixed label instead.
+    """
+    text = " ".join((user_message or "").split())
+    if not text:
+        return "New conversation"
+    # First sentence, if there's a natural break early enough to still be a title.
+    for stop in (". ", "? ", "! "):
+        head, sep, _ = text.partition(stop)
+        if sep and len(head) <= TITLE_MAX_CHARS:
+            text = head
+            break
+    text = text.rstrip("?.!,;: ")
+    if len(text) > TITLE_MAX_CHARS:
+        text = text[:TITLE_MAX_CHARS].rsplit(" ", 1)[0].rstrip(",;: ") + "…"
+    return text or "New conversation"
+
+
+def _clean_title(raw: str) -> str:
+    """Normalise a model-written title; "" means unusable."""
+    text = " ".join((raw or "").split())
+    # Models like to wrap titles in quotes or prefix them with "Title:".
+    if ":" in text[:12] and text.split(":", 1)[0].strip().lower() in {"title", "conversation title"}:
+        text = text.split(":", 1)[1]
+    text = " ".join(text.split()).strip("\"'“”‘’ ").rstrip(".")
+    if len(text) > TITLE_MAX_CHARS:
+        text = text[:TITLE_MAX_CHARS].rsplit(" ", 1)[0].rstrip(",;: ") + "…"
+    return text
+
+
 async def auto_title(user_message: str, assistant_response: str) -> str:
-    """Generate a short conversation title from the first exchange."""
+    """Generate a short conversation title from the first exchange.
+
+    Always returns a non-empty title. LLM_MODEL is a reasoning model (Qwen3):
+    it spends tokens on hidden chain-of-thought before emitting any visible
+    content, so a small max_tokens gets truncated (finish_reason="length")
+    and returns "" — not an error. Hence the generous budget and the explicit
+    empty check: a silent "" here is what put blank rows in the inbox.
+    """
     groq = get_groq_client()
     if not groq.is_available:
-        return user_message[:60]
+        return fallback_title(user_message)
     try:
         resp = await groq.chat_completion(
             [
                 {"role": "system", "content": "Generate a 5-8 word title for this conversation. Return only the title, no punctuation."},
                 {"role": "user", "content": f"User: {user_message[:200]}\nAssistant: {assistant_response[:200]}"},
             ],
-            max_tokens=20,
+            max_tokens=TITLE_MAX_TOKENS,
             temperature=0.3,
             priority=TaskPriority.SYNTHESIS,
         )
-        return resp.choices[0].message.content.strip()
+        title = _clean_title(resp.choices[0].message.content or "")
+        return title or fallback_title(user_message)
     except Exception:
-        return user_message[:60]
+        return fallback_title(user_message)

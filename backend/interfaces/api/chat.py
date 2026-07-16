@@ -122,21 +122,25 @@ async def _stream_response(
     persisted = False
 
     async def _persist(response_text: str) -> None:
-        """Insert the assistant message; auto-title on the first exchange."""
+        """Insert the assistant message; title the conversation if it has none."""
         await aexec(db.schema("misir").table("chat_message").insert({
             "conversation_id": conversation_id,
             "role": "misir",
             "content": response_text,
         }))
         try:
-            msg_count = await aexec(db.schema("misir").table("chat_message").select("id", count="exact").eq("conversation_id", conversation_id))
-            if (msg_count.count or 0) <= 2:
+            # Key off the stored title, not the message count: a conversation
+            # whose first titling attempt failed used to stay blank forever,
+            # because count>2 meant we never looked at it again.
+            row = await aexec(db.schema("misir").table("chat_conversation").select("title").eq("id", conversation_id).limit(1))
+            current = (row.data[0]["title"] or "").strip() if row.data else ""
+            if not current:
                 from application.handlers.chat_handler import auto_title
                 title = await auto_title(user_message, response_text)
                 await aexec(db.schema("misir").table("chat_conversation").update({"title": title}).eq("id", conversation_id))
-        except Exception:
+        except Exception as exc:
             # Titling is cosmetic — never let it fail message persistence.
-            logger.warning("Auto-title failed", conversation_id=conversation_id)
+            logger.warning("Auto-title failed", conversation_id=conversation_id, error=str(exc))
 
     # The LLM stream is pumped through a queue so the response loop can time
     # out on IDLE (context build, Groq rate-limiter waits, slow first token)

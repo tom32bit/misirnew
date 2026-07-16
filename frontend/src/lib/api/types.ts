@@ -141,12 +141,19 @@ export type Conversation = {
   id: number
   user_id: string
   space_id: number | null
+  /** Null until Misir names the thread. The API normalises "" to null. */
   title: string | null
   archived_at: string | null
   created_at: string
   updated_at: string
   /** When the user last opened this conversation; null = never read. */
   last_read_at: string | null
+  /** Newest message in the thread — drives the inbox preview line. */
+  last_message_role?: "user" | "misir" | null
+  last_message_preview?: string | null
+  /** The opening line, shown while the thread is still being named. */
+  opening_message?: string | null
+  message_count?: number
 }
 
 export type ChatMessage = {
