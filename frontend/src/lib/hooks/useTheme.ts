@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from "react"
 
 export type Theme = "light" | "dark"
 
-const STORAGE_KEY = "misir.theme"
+// Versioned deliberately. The app defaults to day; bumping the key from the
+// legacy "misir.theme" retires every previously-saved preference in one shot,
+// so anyone who had toggled to dark lands back on day once. New toggles persist
+// under this key as normal. Keep this in sync with the bootstrap in layout.tsx.
+const STORAGE_KEY = "misir.theme.v2"
 
 function readTheme(): Theme {
   if (typeof document === "undefined") return "light"

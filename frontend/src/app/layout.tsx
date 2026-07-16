@@ -25,9 +25,13 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
 }
 
+// Runs before paint to set the theme with no flash. Reads the versioned key
+// (see useTheme.ts) — anything other than an explicit "dark" resolves to day,
+// so a fresh browser and one carrying only the retired "misir.theme" key both
+// open on day. Keep the key in sync with STORAGE_KEY there.
 const themeBootstrap = `
 (function(){try{
-  var t = localStorage.getItem('misir.theme');
+  var t = localStorage.getItem('misir.theme.v2');
   document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
 }catch(e){
   document.documentElement.setAttribute('data-theme','light');
