@@ -1,8 +1,10 @@
 """Cross-space linking: cosine math + the gates that decide a link is created.
 
-The gate that matters most is ownership: gaps are fetched across spaces, so the
-only thing keeping one user's artifact from linking to another user's gap is the
-user_space_ids filter. That is asserted explicitly below.
+The gate that matters most is ownership. It is enforced twice — as an .in_
+filter on the gap query (so the server never returns another user's rows, and
+the row cap can't eat this user's) and again when scoring each gap, because RLS
+is off. Both layers are asserted below, as is the row-cap regression that made
+the query-side filter necessary in the first place.
 """
 import pytest
 
@@ -22,6 +24,58 @@ def _db_for(artifact_vec, gaps, user_space_ids):
         "gap": FakeResp(data=gaps),
         "space": FakeResp(data=[{"id": i} for i in user_space_ids]),
     })
+
+
+class _LazyResponses(dict):
+    """Lets one table's response be computed at execute() time, after the
+    query's filters have been recorded."""
+
+    def __init__(self, static, table, factory):
+        super().__init__(static)
+        self._table = table
+        self._factory = factory
+
+    def get(self, key, default=None):
+        if key == self._table:
+            return self._factory()
+        return super().get(key, default)
+
+
+class _CappedGapDB(FakeDB):
+    """FakeDB that models PostgREST's max-rows cap on the gap table.
+
+    The hosted API truncates every result set to db-max-rows. Filters the code
+    pushes into the query are applied by the server BEFORE that cap — so what
+    the cap can silently eat depends entirely on how narrow the query is. This
+    fake reproduces that order (filter, then truncate); a plain FakeDB cannot,
+    because it replays a fixed row list however the query was built.
+    """
+
+    MAX_ROWS = 1000
+
+    def __init__(self, artifact_vec, all_gaps, user_space_ids):
+        super().__init__()
+        self._all_gaps = all_gaps
+        self.responses = _LazyResponses(
+            {
+                "artifact": FakeResp(data=[{"content_embedding": artifact_vec}]),
+                "space": FakeResp(data=[{"id": i} for i in user_space_ids]),
+            },
+            "gap",
+            lambda: FakeResp(data=self._gap_rows()),
+        )
+
+    def _gap_rows(self):
+        rows = self._all_gaps
+        for (t, m, args, _kw) in self.calls:
+            if t != "gap":
+                continue
+            if m == "neq" and args[0] == "space_id":
+                rows = [r for r in rows if r["space_id"] != args[1]]
+            elif m == "in_" and args[0] == "space_id":
+                allowed = set(args[1])
+                rows = [r for r in rows if r["space_id"] in allowed]
+        return rows[: self.MAX_ROWS]
 
 
 @pytest.fixture
@@ -120,6 +174,47 @@ async def test_only_gaps_outside_the_artifacts_own_space_are_queried(linker):
     gap_filters = [(m, args) for (t, m, args, kw) in db.calls if t == "gap" and m == "neq"]
     assert ("neq", ("space_id", 1)) in gap_filters
     assert ("neq", ("status", "resolved")) in gap_filters
+
+
+async def test_ownership_scope_is_pushed_into_the_gap_query(linker):
+    """Ownership must be a query filter, not only a post-fetch check — see the
+    row-cap test below for what an unscoped fetch costs."""
+    db = _db_for([1.0, 0.0], [], user_space_ids=[2, 3])
+    await linker(db).find_links(artifact_id=1, user_id="uid", artifact_space_id=1)
+
+    scoped = [args for (t, m, args, kw) in db.calls if t == "gap" and m == "in_"]
+    assert ("space_id", [2, 3]) in [(a[0], list(a[1])) for a in scoped]
+
+
+async def test_no_gap_query_is_issued_when_the_user_owns_no_spaces(linker):
+    db = _db_for([1.0, 0.0], [], user_space_ids=[])
+    await linker(db).find_links(artifact_id=1, user_id="uid", artifact_space_id=1)
+
+    assert not [c for c in db.calls if c[0] == "gap"]
+    assert _upserts(db) == []
+
+
+async def test_users_gaps_are_still_found_when_the_table_exceeds_the_row_cap(linker):
+    """Regression: the gap fetch used to run unscoped across every user.
+
+    PostgREST truncates the result to db-max-rows, so once the global gap table
+    outgrows that cap an unscoped query comes back full of other users' rows and
+    this user's gap never arrives — cross-space linking degrades to silently
+    doing nothing, with no error and no log. Scoping the query to the user's own
+    spaces keeps the result far under the cap.
+    """
+    other_users_gaps = [
+        {"id": i, "space_id": 999, "gap_text_embedding": [0.0, 1.0]}
+        for i in range(_CappedGapDB.MAX_ROWS)
+    ]
+    mine = {"id": 12345, "space_id": 2, "gap_text_embedding": [1.0, 0.0]}  # similarity 1.0
+    db = _CappedGapDB([1.0, 0.0], other_users_gaps + [mine], user_space_ids=[2])
+
+    await linker(db).find_links(artifact_id=1, user_id="uid", artifact_space_id=1)
+
+    payloads = _upserts(db)
+    assert len(payloads) == 1, "the user's own gap was lost behind the row cap"
+    assert [link["target_gap_id"] for link in payloads[0]] == [12345]
 
 
 async def test_all_qualifying_gaps_are_linked_in_one_upsert(linker):

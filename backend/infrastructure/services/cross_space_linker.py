@@ -2,8 +2,12 @@
 Cross-space link discovery (§2.1, §6).
 
 At capture time: cosine similarity between the new artifact's content_embedding
-and every open gap's gap_text_embedding (across all of the user's spaces).
-If similarity ≥ threshold AND the gap is in a different space → insert cross_space_link.
+and the gap_text_embedding of every open gap in the user's OTHER spaces.
+If similarity ≥ threshold → insert cross_space_link.
+
+Ownership is a filter on the gap query itself, never a post-fetch check: the
+result set is capped server-side, so a query that spans every user would be
+truncated to strangers' rows long before this user's gaps were seen.
 """
 from __future__ import annotations
 
@@ -39,11 +43,25 @@ class CrossSpaceLinker:
             return
         art_vec = art.data[0]["content_embedding"]
 
-        # Fetch all open gaps with embeddings for THIS user (across spaces)
+        # Resolve the user's spaces FIRST so ownership can be pushed into the gap
+        # query below. Fetching gaps unscoped and filtering here would be wrong,
+        # not just wasteful: PostgREST caps every result at db-max-rows, so once
+        # the global gap table outgrows that cap an unscoped query returns other
+        # users' rows and this user's gaps never arrive — linking would quietly
+        # stop working as the table grew.
+        user_space_ids = {
+            s["id"] for s in
+            (db.schema("misir").table("space").select("id").eq("user_id", user_id).execute().data or [])
+        }
+        if not user_space_ids:
+            return
+
+        # Open gaps with embeddings in THIS user's other spaces.
         gaps = (
             db.schema("misir")
             .table("gap")
             .select("id, space_id, gap_text_embedding")
+            .in_("space_id", sorted(user_space_ids))
             .neq("space_id", artifact_space_id)
             .neq("status", "resolved")
             .not_.is_("gap_text_embedding", "null")
@@ -52,14 +70,11 @@ class CrossSpaceLinker:
         if not gaps.data:
             return
 
-        # Filter to gaps in spaces owned by this user
-        user_space_ids = {
-            s["id"] for s in
-            (db.schema("misir").table("space").select("id").eq("user_id", user_id).execute().data or [])
-        }
-
         links = []
         for gap in gaps.data:
+            # Belt-and-braces: ownership is already enforced by the .in_ filter
+            # above. Kept because RLS is off, so this is the last thing standing
+            # between a query-building slip and a cross-tenant link.
             if gap["space_id"] not in user_space_ids:
                 continue
             sim = _cosine(art_vec, gap["gap_text_embedding"])
