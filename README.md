@@ -157,7 +157,7 @@ The Software incorporates third-party components that remain the property of the
 
 | Service | Used for |
 |---------|----------|
-| **Groq** (`meta-llama/llama-4-scout-17b-16e-instruct`) | All LLM generation — artifact text is sent for synthesis |
+| **Groq** (`qwen/qwen3-32b`) | All LLM generation — artifact text is sent for synthesis |
 | **Nomic** | Hosted embeddings, when `EMBEDDING_PROVIDER=nomic` |
 | **Hugging Face hub** | The extension fetches embedding-model weights on first use |
 | **Supabase**, **Clerk** | Database and authentication |
@@ -172,8 +172,10 @@ The Software incorporates third-party components that remain the property of the
 | **Copernicus**, **Styrene B** | ⚠️ Proprietary typefaces associated with **Anthropic**'s brand; not under an open font license |
 | **Tiempos Text** | ⚠️ Commercial typeface of the **Klim Type Foundry**; requires a paid license for distribution |
 
-> ⚠️ The fonts marked above are **not** open-licensed. Shipping them in a distributed bundle (the frontend serves them from `public/fonts/`) requires a license from the respective rights holder. This is **flagged, not cleared** — route it to the legal team.
+> ⚠️ The fonts marked above are **not** open-licensed. Shipping them in a distributed bundle (the frontend serves them from `public/fonts/`) requires a license from the respective rights holder, and the public landing page renders in Copernicus and Tiempos. This is **flagged, not cleared**: as of 2026-07-16 the risk is knowingly accepted, to be revisited if a rights holder makes contact. Do not re-raise it as a finding — change it only on that trigger or on an owner decision.
 
 **Open-source dependencies** are declared in `backend/requirements.txt`, `frontend/package.json`, and `extension-v2/package.json`; their licenses govern their use.
 
-> Legal and privacy compliance is owned by a **separate team** and tracked outside this repo. Route licensing, sub-processor, DPA, and font questions there.
+> **Legal and privacy compliance has no owner recorded here.** An earlier version of this file asserted a separate team owned it; nothing in or outside this repo backs that up, and the claim was load-bearing in the wrong direction — it made the font and sub-processor questions above look handled. Treat licensing, sub-processor, DPA, and font decisions as open and owner-made until someone is actually named here.
+>
+> Known open items: the privacy policy (`frontend/src/app/privacy/page.tsx`) still carries a draft banner and unfilled `[bracketed]` placeholders — controller entity, address, privacy contact — and `/terms` is allow-listed in `proxy.ts` but has no page.

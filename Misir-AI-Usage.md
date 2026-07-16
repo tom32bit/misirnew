@@ -70,7 +70,7 @@ Same inputs → same number, every time, with a one-line explanation. That's the
 
 | Layer | Technology | Where | Notes |
 |---|---|---|---|
-| **Generation (LLM)** | **Groq** — `meta-llama/llama-4-scout-17b-16e-instruct` | Backend, all synthesis/chat/nudge/generation | Default `temperature=0.3` for synthesis (determinism-leaning), `0.7` for chat. `max_tokens=1024` default. Single client: [groq_client.py](backend/infrastructure/services/groq_client.py) |
+| **Generation (LLM)** | **Groq** — `qwen/qwen3-32b` | Backend, all synthesis/chat/nudge/generation | Default `temperature=0.3` for synthesis (determinism-leaning), `0.7` for chat. `max_tokens=1024` default. Single client: [groq_client.py](backend/infrastructure/services/groq_client.py) |
 | **Embeddings (server)** | `nomic-ai/nomic-embed-text-v1.5`, 768-dim | Backend | `local` (in-process torch) or `nomic` (hosted API) — same model + dims either way, so no DB migration. [embedding_service.py](backend/infrastructure/services/embedding_service.py) |
 | **Embeddings (client)** | **same** Nomic model, 768-dim, q8-quantized (~140 MB) | **Extension, on-device** | transformers.js + onnxruntime-web (WASM) in an **offscreen document**. Contract mirrors the backend byte-for-byte, so client and server vectors are comparable. [embedder.ts](extension-v2/src/lib/embedder.ts) |
 | **Vector search** | pgvector (Postgres) | DB | Cross-space linking, content similarity |
