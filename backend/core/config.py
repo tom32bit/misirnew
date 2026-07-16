@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Misir"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
+    # Serve /docs, /redoc and openapi.json. Off by default: they enumerate every
+    # route and model, which is help locally and free reconnaissance in public.
+    # Set DOCS_ENABLED=true in a local .env when you want them.
+    DOCS_ENABLED: bool = False
 
     # Supabase (service-role only — backend never exposes anon key)
     SUPABASE_URL: str

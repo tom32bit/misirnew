@@ -47,3 +47,14 @@ def test_dos_middleware_and_limiter_configured():
     assert main.limiter._default_limits  # global default present
     names = {m.cls.__name__ for m in main.app.user_middleware}
     assert {"SlowAPIMiddleware", "BodySizeLimitMiddleware", "MetricsMiddleware"} <= names
+
+
+def test_api_docs_are_not_public_by_default():
+    """/docs, /redoc and openapi.json enumerate every route, parameter and model.
+    They default to off so a deployment doesn't hand that out to anyone asking;
+    DOCS_ENABLED=true turns them back on locally."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(main.app, raise_server_exceptions=False)
+    for path in ("/docs", "/redoc", "/api/v1/openapi.json"):
+        assert client.get(path).status_code == 404, f"{path} should not be served"

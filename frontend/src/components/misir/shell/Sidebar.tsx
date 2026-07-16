@@ -240,6 +240,16 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
         })}
       </div>
 
+      {/* Extension install. Misir captures nothing without it, so this stays one
+          click from every dashboard view rather than buried in settings. */}
+      <Link
+        href="/install"
+        className="flex items-center gap-2.5 border-t border-border px-3.5 py-2.5 text-[12.5px] leading-tight text-fg-muted transition-colors hover:bg-[var(--bg-hover)] hover:text-fg"
+      >
+        <Icon name="download" size={14} />
+        Install extension
+      </Link>
+
       {/* Profile strip */}
       <div className="flex items-center gap-2.5 border-t border-border px-3.5 py-3">
         <button

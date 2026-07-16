@@ -64,10 +64,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# /docs, /redoc and the OpenAPI schema publish the entire API surface — every
+# route, parameter and model — to anyone who asks. That is useful locally and
+# needless exposure for a closed beta, so they are opt-in via DOCS_ENABLED
+# (default off; set DOCS_ENABLED=true in .env for local work).
+_docs = settings.DOCS_ENABLED
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if _docs else None,
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
     lifespan=lifespan,
 )
 

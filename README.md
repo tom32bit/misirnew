@@ -12,6 +12,7 @@
 - [How it fits together](#how-it-fits-together)
 - [Quickstart](#quickstart)
 - [CI](#ci)
+- [Deployment](#deployment)
 - [Documentation](#documentation)
 - [Conventions that matter](#conventions-that-matter)
 - [Third-Party Notices](#third-party-notices)
@@ -131,6 +132,65 @@ Run `npm run eval` whenever you touch matching — it is deliberately **not** a 
 | **Extension** | `vitest` + `npm run build`, which runs `tsc` first — type-checking **blocks** |
 
 > Modifying `.github/workflows/**` requires a token with the `workflow` scope.
+
+## Deployment
+
+Free-tier topology. Each piece hands the next one a URL, which is why the order matters.
+
+| Piece | Host | Notes |
+|-------|------|-------|
+| **Backend** | Render free ([`render.yaml`](render.yaml)) | 512MB / 0.1 CPU. Blueprint, native Python — no Docker. Sleeps after 15 min idle → **30–50s cold start**. |
+| **Frontend** | Vercel free | Root directory `frontend`. |
+| **Database** | Supabase free | Run `v2.0/*.sql` in order: `schema` → `subspace` → `read_state` → `privacy`. |
+| **Extension** | Supabase Storage (public bucket) | Zipped `dist/`, ~7.4MB, installed unpacked — see [`/install`](frontend/src/app/install/page.tsx). |
+
+**What makes the free tier work:** `EMBEDDING_PROVIDER=nomic`. The `local` provider loads
+nomic-embed-text-v1.5 in-process via torch (~1–1.5GB) and will not fit 512MB.
+`requirements.txt` therefore omits `sentence-transformers`; the import in
+`embedding_service._load_model` is lazy, so it is never reached. Same model, same
+768 dims either way — switching providers needs no re-embedding.
+
+**Ordering traps:**
+
+1. **`CORS_ORIGINS` must be set on the backend** to the deployed frontend origin, as a JSON
+   array, **no trailing slash** — `["https://your-app.vercel.app"]`. The defaults in
+   `config.py` are localhost-only, so without this the dashboard loads and every API call
+   fails in the browser. It can only be set *after* the frontend has a domain.
+2. **Build the extension last.** Vite inlines `import.meta.env.*` at build time, so
+   `VITE_BACKEND_URL` / `VITE_CLERK_SYNC_HOST` are compiled into the bundle. A build made
+   before the URLs exist ships pointing at localhost and fails silently for every user.
+3. **`manifest.json` `host_permissions` must include the frontend origin.** `auth.ts` reads
+   the Clerk `__session` cookie via `chrome.cookies.get()`; without the permission there is
+   no error, just no token.
+4. **The extension does NOT need a Nomic key.** It fetches the open weights from the
+   Hugging Face hub and runs them on-device. `NOMIC_API_KEY` is backend-only.
+
+Server-side env not in `.env.example`: `EXTENSION_ZIP_URL` (frontend) — the public URL of the
+packaged extension zip, which [`/api/download/extension`](frontend/src/app/api/download/extension/route.ts)
+redirects to. Deliberately **not** `NEXT_PUBLIC_`, so the storage host can change without a rebuild.
+
+**Keeping the backend warm (optional).** Render free sleeps after 15 min idle. A request to
+`/health` every ~14 min avoids the cold start, and the budget works out: the free plan allows
+750 hrs/month against a ~730-hr month, so one always-on service fits. Use an **external** cron
+(cron-job.org, UptimeRobot) — a GitHub Actions schedule does **not** work here: runs are billed
+at a 1-minute minimum, so any interval under 15 min costs ~3,000 min/month against a 2,000-min
+free allowance for private repos, and any interval cheap enough to fit is too slow to prevent
+the sleep.
+
+**Publishing an extension build:**
+
+```bash
+cd extension-v2 && npm run build
+# zip the CONTENTS of dist/ — manifest.json must sit at the zip root
+Compress-Archive -Path dist\* -DestinationPath misir-extension-latest.zip -Force   # PowerShell
+```
+
+Upload to the Storage bucket, overwriting `misir-extension-latest.zip`. Objects are served
+`no-cache`, so it ships immediately — no frontend redeploy. The zip is gitignored; it lives in
+Storage, not the repo.
+
+`/docs`, `/redoc` and `openapi.json` are **off unless `DOCS_ENABLED=true`** — they enumerate
+the whole API surface.
 
 ## Documentation
 

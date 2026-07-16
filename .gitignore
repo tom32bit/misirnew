@@ -26,6 +26,9 @@ next-env.d.ts
 dist/
 dist-prod/
 .cache/
+# Packaged extension (~7.4MB). Built from dist/ and uploaded to Supabase
+# Storage; the download is served from there, never from the repo.
+extension-v2/*.zip
 
 # ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/

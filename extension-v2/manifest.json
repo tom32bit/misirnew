@@ -48,6 +48,8 @@
   "host_permissions": [
     "http://localhost:3000/*",
     "http://localhost:8000/*",
+    "https://misirnew.vercel.app/*",
+    "https://misir-backend.onrender.com/*",
     "https://misir.app/*",
     "https://api.misir.app/*",
     "https://*.huggingface.co/*",
