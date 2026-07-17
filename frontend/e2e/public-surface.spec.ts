@@ -75,6 +75,40 @@ test.describe("landing", () => {
     expect(bad, "assets returned a redirect/error instead of bytes").toEqual([])
   })
 
+  test("shows the hero (its entrance animation is not dead)", async ({ page }) => {
+    // Regression: the whole hero is built from `.rise` elements that start at
+    // opacity 0 and animate to 1 via `@keyframes rise`. That keyframe was
+    // nested inside `.landing { }`, which is invalid — the prod CSS minifier
+    // dropped it, so the animation referenced a missing keyframe and every
+    // hero element stayed at opacity 0. It only showed under
+    // prefers-reduced-motion (which forces opacity 1), so it looked fine on a
+    // Reduce-Motion desktop and blank on a normal phone. Playwright defaults to
+    // reduced-motion: no-preference — the phone/broken condition — so a dropped
+    // keyframe fails here. Assert the hero actually resolves to visible.
+    await page.goto("/")
+    const h1 = page.locator(".hero-copy h1")
+    await expect(h1).toBeVisible()
+
+    // Poll parsed opacity toward 1 rather than === "1": a dropped keyframe pins
+    // it at 0, while a working animation lands on 1 after its delay — polling a
+    // near-1 threshold ignores the in-flight frames without hiding the bug.
+    const opacityOf = (sel: string) =>
+      page.locator(sel).evaluate((el) => parseFloat(getComputedStyle(el).opacity))
+
+    await expect
+      .poll(() => opacityOf(".hero-copy h1"), {
+        message: "hero heading stuck transparent — is @keyframes rise missing from the bundle?",
+        timeout: 5_000,
+      })
+      .toBeGreaterThan(0.99)
+
+    // The CTAs are a separate .rise group (latest delay), so check them too.
+    // Scope to .hero-copy — a second .hero-ctas lives in the final section.
+    await expect
+      .poll(() => opacityOf(".hero-copy .hero-ctas"), { timeout: 5_000 })
+      .toBeGreaterThan(0.99)
+  })
+
   test("plays the closing video", async ({ page }) => {
     await page.goto("/")
     const video = page.locator("video")
