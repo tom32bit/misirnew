@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { CONSENT_CHANGED_EVENT } from "@/lib/analytics/consent"
 
 const KEY = "misir.privacyConsent"
 const VERSION = "2026-06-07"
@@ -15,6 +16,12 @@ function record(decision: Decision, age18: boolean, gpc: boolean) {
       KEY,
       JSON.stringify({ decision, age18, gpc, version: VERSION, at: Date.now() }),
     )
+  } catch {
+    /* ignore */
+  }
+  // Let analytics (PostHog) opt in/out live without a page reload.
+  try {
+    window.dispatchEvent(new CustomEvent(CONSENT_CHANGED_EVENT, { detail: decision }))
   } catch {
     /* ignore */
   }

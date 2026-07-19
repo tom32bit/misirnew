@@ -139,6 +139,15 @@ class Settings(BaseSettings):
     # empty the internal purge endpoint is disabled (use pg_cron instead).
     INTERNAL_OPS_TOKEN: str = ""
 
+    # ── Product analytics (PostHog, server-side) ──────────────────────────────
+    # Server-side capture is best-effort and disabled unless a key is set — the
+    # posthog client short-circuits to a no-op with no key, so leaving these
+    # blank keeps analytics fully off. HOST is the project's home region
+    # (https://us.i.posthog.com or https://eu.i.posthog.com). Events are keyed by
+    # the same internal user_id the app uses so they line up with the frontend.
+    POSTHOG_API_KEY: str = ""
+    POSTHOG_HOST: str = "https://us.i.posthog.com"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

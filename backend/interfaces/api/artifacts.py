@@ -24,6 +24,7 @@ from core.logging_config import get_logger
 from domain.entities.common import EngagementLevel, PlatformType
 from infrastructure.jobs.queue import enqueue
 from infrastructure.services import consent_service
+from infrastructure.services.analytics_service import get_analytics
 from infrastructure.services.db_async import aexec
 from infrastructure.services.supabase_client import get_supabase
 from interfaces.api.spaces import _resolve_user_id
@@ -295,6 +296,20 @@ def capture_artifact(
     # whether the requested space survived validation, so the extension can trust
     # (or correct) its local "matched" state. `id` stays for backwards-compat.
     artifact["space_accepted"] = space_accepted
+
+    # Product analytics (best-effort, non-blocking). Metadata only — never the
+    # captured content itself.
+    get_analytics().capture(
+        user_id,
+        "artifact_captured",
+        {
+            "content_source": body.content_source,
+            "platform": getattr(body.platform, "value", body.platform),
+            "engagement_level": body.engagement_level.value,
+            "word_count": body.word_count,
+            "space_accepted": space_accepted,
+        },
+    )
     return artifact
 
 

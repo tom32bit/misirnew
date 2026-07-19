@@ -15,6 +15,7 @@ import { findBestMatch, hasKeywordEvidence } from '@/lib/matching'
 import type { MatchResult } from '@/lib/matching'
 import type { Space, SubspaceWithMarkers } from '@/lib/types'
 import { redactPII } from '@/lib/redact'
+import { captureEvent } from '@/lib/analytics'
 import { chatCaptureToText } from '@/lib/types/chat'
 import type {
   CapturePageMessage,
@@ -1261,8 +1262,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 })
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   updateSmartMatchBadge()
+  // Consent-gated inside captureEvent; no-ops until the user opts into capture.
+  void captureEvent('extension_installed', { reason: details.reason })
 })
 
 // ── Init ──────────────────────────────────────────────────────────────────────

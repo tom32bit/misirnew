@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { MotionConfig } from "motion/react"
 import { Toaster } from "sonner"
 import { useState } from "react"
+import { PostHogIdentify } from "@/components/analytics/PostHogIdentify"
 
 function makeQueryClient() {
   return new QueryClient({
@@ -39,6 +40,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <QueryClientProvider client={queryClient}>
+        {/* Syncs the PostHog person with the Clerk session (identify/reset). */}
+        <PostHogIdentify />
         {/* Honors the OS "reduce motion" setting for all transform/layout
             animations app-wide; value-based sweeps opt in via useReducedMotion. */}
         <MotionConfig reducedMotion="user">{children}</MotionConfig>

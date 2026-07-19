@@ -15,6 +15,11 @@ const isPublic = createRouteMatcher([
   "/api/webhooks(.*)",
   "/privacy(.*)",
   "/terms(.*)",
+  // PostHog reverse proxy (see rewrites in next.config.ts). Analytics ingestion
+  // must never be auth-gated — a signed-out landing-page visitor generates
+  // pageview/autocapture events too, and auth.protect() would 307 them to
+  // /sign-in so the beacon never reaches PostHog.
+  "/ingest(.*)",
 ])
 
 export default clerkMiddleware(async (auth, req) => {

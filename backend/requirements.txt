@@ -35,6 +35,9 @@ redis==5.2.1
 # Logging
 structlog==24.4.0
 
+# Product analytics (server-side, best-effort; disabled without POSTHOG_API_KEY)
+posthog==3.7.4
+
 # Error types
 result==0.17.0
 

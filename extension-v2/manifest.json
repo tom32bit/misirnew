@@ -55,6 +55,8 @@
     "https://api.misir.app/*",
     "https://*.huggingface.co/*",
     "https://cdn.jsdelivr.net/*",
+    "https://us.i.posthog.com/*",
+    "https://eu.i.posthog.com/*",
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",

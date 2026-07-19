@@ -63,6 +63,15 @@ async def lifespan(app: FastAPI):
     loop.run_in_executor(None, _warm)
     yield
 
+    # Flush any buffered analytics events before the process exits so the last
+    # batch isn't lost on shutdown. Best-effort — never raise from teardown.
+    try:
+        from infrastructure.services.analytics_service import get_analytics
+        get_analytics().flush()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("analytics flush on shutdown failed")
+
 
 # /docs, /redoc and the OpenAPI schema publish the entire API surface — every
 # route, parameter and model — to anyone who asks. That is useful locally and

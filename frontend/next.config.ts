@@ -45,17 +45,19 @@ const reportOnlyCsp = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
-  "form-action 'self' https://*.clerk.accounts.dev https://*.clerk.com",
+  "form-action 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.misir.app https://accounts.misir.app",
   // Clerk SDK + Cloudflare Turnstile (Clerk bot protection). 'unsafe-eval' is
-  // only needed in dev (React debug eval); never in prod.
-  "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com" +
+  // only needed in dev (React debug eval); never in prod. clerk.misir.app /
+  // accounts.misir.app are the production custom-domain Frontend API + Account
+  // portal (dev instances still use *.clerk.accounts.dev).
+  "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.misir.app https://accounts.misir.app https://challenges.cloudflare.com" +
     (isDev ? " 'unsafe-eval'" : ""),
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.gravatar.com",
+  "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://clerk.misir.app https://*.gravatar.com",
   "font-src 'self' data:", // next/font self-hosts, so no fonts.gstatic.com needed
-  `connect-src 'self'${api ? " " + api : ""} https://*.clerk.accounts.dev https://*.clerk.com https://clerk-telemetry.com`,
+  `connect-src 'self'${api ? " " + api : ""} https://*.clerk.accounts.dev https://*.clerk.com https://clerk.misir.app https://accounts.misir.app https://clerk-telemetry.com`,
   "worker-src 'self' blob:",
-  "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://*.clerk.com",
+  "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://*.clerk.com https://clerk.misir.app https://accounts.misir.app",
 ].join("; ");
 
 const securityHeaders = [
@@ -70,11 +72,47 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
 ];
 
+// ── PostHog reverse proxy ────────────────────────────────────────────────────
+// Analytics traffic is served first-party under /ingest and rewritten to
+// PostHog's ingestion + asset hosts. Benefits: (1) ad-blockers that block
+// *.posthog.com don't blank our analytics, (2) the browser only ever talks to
+// our own origin, so the CSP connect-src/script-src stay 'self' — no external
+// hosts to allow-list. The upstream region is derived from NEXT_PUBLIC_POSTHOG_HOST
+// (the project's home region, e.g. https://us.i.posthog.com or https://eu.i.posthog.com);
+// its asset host is the same host with the i.→assets. swap PostHog uses.
+function posthogUpstream(): { api: string; assets: string } {
+  const fallback = "https://us.i.posthog.com";
+  let api = fallback;
+  try {
+    api = process.env.NEXT_PUBLIC_POSTHOG_HOST
+      ? new URL(process.env.NEXT_PUBLIC_POSTHOG_HOST).origin
+      : fallback;
+  } catch {
+    api = fallback;
+  }
+  // us.i.posthog.com → us-assets.i.posthog.com ; eu.i.posthog.com → eu-assets.i.posthog.com
+  const assets = api.replace("://us.i.", "://us-assets.i.").replace("://eu.i.", "://eu-assets.i.");
+  return { api, assets };
+}
+
+const ph = posthogUpstream();
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "img.clerk.com" },
     ],
+  },
+  // PostHog appends a trailing slash to some ingestion paths; without this Next
+  // would 308-redirect and drop the payload.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      // Static assets (array.js, recorder, toolbar) — must come first so the
+      // more specific /static prefix wins over the catch-all below.
+      { source: "/ingest/static/:path*", destination: `${ph.assets}/static/:path*` },
+      { source: "/ingest/:path*", destination: `${ph.api}/:path*` },
+    ];
   },
   async headers() {
     return [
