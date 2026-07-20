@@ -1,7 +1,9 @@
 "use client"
 
-import { useReducer, useState } from "react"
+import { useEffect, useReducer, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence } from "motion/react"
+import { useSpaces } from "@/lib/hooks/useSpaces"
 import { ObChrome } from "./ObChrome"
 import { StepChallenge } from "./StepChallenge"
 import { StepOutcome } from "./StepOutcome"
@@ -44,6 +46,18 @@ export function OnboardingFlow() {
   // Used to drive AnimatePresence; bumping the key forces step components to
   // unmount-then-remount with their enter animations.
   const [, setKey] = useState(0)
+
+  // Client-side guard: onboarding is for users with no spaces. If the client's
+  // read (the one that reflects what the user actually has) finds spaces, leave
+  // immediately — this is the reliable counterpart to the server routing, so an
+  // existing user can never get stuck here regardless of how they arrived.
+  const router = useRouter()
+  const { data: spaces } = useSpaces()
+  useEffect(() => {
+    if (spaces && spaces.length > 0) {
+      router.replace(`/dashboard/${spaces[0].id}/home`)
+    }
+  }, [spaces, router])
 
   const go = (step: StepId) => {
     setKey((k) => k + 1)

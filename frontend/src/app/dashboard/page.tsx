@@ -30,6 +30,13 @@ export default async function DashboardIndex() {
     )
   }
 
-  if (spaces.length === 0) redirect("/onboarding")
+  // Don't decide onboarding-vs-dashboard from this server read. It resolves the
+  // Clerk session server-side, which can disagree with the client (token timing,
+  // instance/key skew after a Clerk migration) and return an empty list for a
+  // user who genuinely has spaces — trapping them in onboarding on every login.
+  // Route to the home view and let the client, whose useSpaces() reflects what
+  // the user actually sees, make the call (HomeAll redirects to /onboarding only
+  // on a confirmed-empty client read). `spaces` still warms the layout's sidebar.
+  void spaces
   redirect("/dashboard/all/home")
 }
