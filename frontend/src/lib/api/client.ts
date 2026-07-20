@@ -4,6 +4,7 @@ import ky from "ky"
 import { useAuth } from "@clerk/nextjs"
 import { useMemo } from "react"
 import { API_URL } from "@/lib/env"
+import { REQUEST_TIMEOUT_MS, RETRY_POLICY } from "./retry"
 
 const BASE = API_URL
 
@@ -21,8 +22,8 @@ export function useApi() {
     () =>
       ky.create({
         prefixUrl: BASE,
-        timeout: 30_000,
-        retry: { limit: 1, methods: ["get"], statusCodes: [502, 503, 504] },
+        timeout: REQUEST_TIMEOUT_MS,
+        retry: RETRY_POLICY,
         hooks: {
           beforeRequest: [
             async (request) => {

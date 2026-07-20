@@ -1,6 +1,7 @@
 import ky from "ky"
 import { auth } from "@clerk/nextjs/server"
 import { API_URL } from "@/lib/env"
+import { REQUEST_TIMEOUT_MS, RETRY_POLICY } from "./retry"
 
 /**
  * Server-side ky for use inside RSC, server actions, and route handlers.
@@ -12,7 +13,8 @@ export async function serverApi() {
 
   return ky.create({
     prefixUrl: API_URL,
-    timeout: 30_000,
+    timeout: REQUEST_TIMEOUT_MS,
+    retry: RETRY_POLICY,
     cache: "no-store",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })

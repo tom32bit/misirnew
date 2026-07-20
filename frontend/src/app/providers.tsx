@@ -12,9 +12,21 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,
+        // Dashboard payloads are LLM-synthesised server-side and cached there by
+        // content hash, so re-asking within a couple of minutes returns the same
+        // bytes. Holding them here means moving between spaces and views is
+        // instant instead of a round trip each time.
+        staleTime: 120_000,
+        // Keep them past unmount: navigating away and back should paint from
+        // cache and revalidate behind the scenes, not fall back to a skeleton.
+        gcTime: 30 * 60_000,
         refetchOnWindowFocus: false,
-        retry: 1,
+        // ky already retries transport failures (see lib/api/retry.ts). This is
+        // the outer layer for anything that surfaces as a rejected promise —
+        // notably a cold start that outlives ky's own attempts. Capped, with
+        // backoff, so a genuinely-down backend still surfaces reasonably fast.
+        retry: 2,
+        retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
       },
       mutations: { retry: 0 },
     },

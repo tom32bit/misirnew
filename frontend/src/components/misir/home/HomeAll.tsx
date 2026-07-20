@@ -16,6 +16,7 @@ import { Hero } from "./Hero"
 import { InsightList } from "./InsightList"
 import { StatStrip, UpNext, Connections, RecentCaptures, Tensions } from "./HomePanels"
 import { Skeleton } from "@/components/misir/primitives/Skeleton"
+import { BackendUnreachable } from "@/components/misir/primitives/BackendUnreachable"
 
 /**
  * Build a single dashboard-derived view-model for each space so all
@@ -35,12 +36,16 @@ export function HomeAll() {
   const router = useRouter()
   const { period, date, tzOffset } = usePeriodParams()
   const { user } = useUser()
-  const { data: spaces = [], isLoading } = useSpaces()
+  const { data: spaces = [], isLoading, isError, refetch } = useSpaces()
   useEffect(() => {
-    if (!isLoading && spaces.length === 0) {
+    // `spaces = []` is also the default while the request is failing, so this
+    // must wait for a SUCCESSFUL empty response. Without the isError guard a
+    // cold-start timeout looked identical to "new user, no spaces" and bounced
+    // an existing user into onboarding.
+    if (!isLoading && !isError && spaces.length === 0) {
       router.replace("/onboarding")
     }
-  }, [isLoading, spaces.length, router])
+  }, [isLoading, isError, spaces.length, router])
   const dashboards = useDashboards(
     spaces.map((s) => s.id),
     period,
@@ -63,6 +68,10 @@ export function HomeAll() {
 
   const totalCaptures = vms.reduce((s, v) => s + v.capturesWeek, 0)
   const totalCritical = vms.reduce((s, v) => s + v.criticalGaps, 0)
+
+  // The request failed rather than returning no spaces. Say so — returning
+  // null here rendered a blank page and left the user with nothing to act on.
+  if (isError) return <BackendUnreachable onRetry={() => refetch()} />
 
   if (!isLoading && spaces.length === 0) return null
 

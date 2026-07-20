@@ -10,3 +10,4 @@ export { Card, CardHeader, CardBody, SectionHead, Spacer, ProgressBar } from "./
 export { FilterBar, Segmented, FilterCount, type SegmentOption } from "./FilterBar"
 export { ChatCTA } from "./ChatCTA"
 export { Icon } from "./Icon"
+export { BackendUnreachable } from "./BackendUnreachable"
