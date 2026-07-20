@@ -100,6 +100,16 @@ export function Sidebar({ initialSpaces }: { initialSpaces: Space[] }) {
   }
 
   const handleLogout = () => {
+    // Drop this account's cached research before the session ends. The query
+    // cache is persisted to localStorage (see providers.tsx); without clearing
+    // it, one user's synthesised data lingers in the browser after they log out,
+    // readable by whoever signs in next on a shared machine.
+    qc.clear()
+    try {
+      window.localStorage.removeItem("misir-query-cache")
+    } catch {
+      // Private mode / storage disabled — nothing persisted to clear.
+    }
     // "/" and not "/sign-in": signing out should land on the marketing page, not
     // a login form inviting you straight back in. The session is gone by the time
     // we get there, so the root route renders the landing rather than bouncing to

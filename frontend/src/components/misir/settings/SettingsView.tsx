@@ -25,10 +25,14 @@ import { useDeadline, useUpsertDeadline, useRemoveDeadline } from "@/lib/hooks/u
 type Scope = "all" | number
 
 export function SettingsView({ scope }: { scope: Scope }) {
+  // Account-level settings (privacy, data export, delete account) belong to the
+  // account, not to any one space — so they live only in the all-spaces settings
+  // (/dashboard/all/settings). A specific space's settings shows only that
+  // space's settings; deleting your whole account from inside "Space X" was a
+  // placement bug.
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5">
-      <AccountPrivacySection />
-      {scope !== "all" && <SpaceSettings spaceId={scope} />}
+      {scope === "all" ? <AccountPrivacySection /> : <SpaceSettings spaceId={scope} />}
     </div>
   )
 }
