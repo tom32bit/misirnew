@@ -1,7 +1,9 @@
 "use client"
 
-import { ClerkProvider } from "@clerk/nextjs"
+import { ClerkProvider, useAuth } from "@clerk/nextjs"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client"
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { MotionConfig } from "motion/react"
 import { Toaster } from "sonner"
@@ -33,9 +35,86 @@ function makeQueryClient() {
   })
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => makeQueryClient())
+/** localStorage persister. Undefined storage on the server → a safe no-op. */
+function makePersister() {
+  return createSyncStoragePersister({
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    key: "misir-query-cache",
+    throttleTime: 1_000,
+  })
+}
 
+const CACHE_MAX_AGE = 30 * 60_000 // mirror gcTime — don't hydrate staler than we'd keep
+
+/**
+ * Bridges Clerk auth into the query cache's persistence.
+ *
+ * Persisting to localStorage is what lets a reload paint from cache instead of
+ * hitting the backend every time. But the cache holds one user's synthesised
+ * research, and localStorage is shared across accounts on the same browser — so
+ * `buster: userId` scopes it: signing in as someone else busts the previous
+ * user's cache instead of showing it to them.
+ *
+ * Gated on `isLoaded`: before Clerk resolves the user we render a plain
+ * provider with no persistence. Restoring an "anon" cache first and then
+ * busting it the instant userId arrived would refetch on every load — the exact
+ * thing persistence is meant to prevent.
+ */
+function AuthScopedQuery({ children }: { children: React.ReactNode }) {
+  const { isLoaded, userId } = useAuth()
+  const [client] = useState(makeQueryClient)
+  const [persister] = useState(makePersister)
+
+  const extras = (
+    <>
+      {/* Syncs the PostHog person with the Clerk session (identify/reset). */}
+      <PostHogIdentify />
+      {/* Honors the OS "reduce motion" setting for all transform/layout
+          animations app-wide; value-based sweeps opt in via useReducedMotion. */}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      <Toaster
+        position="bottom-right"
+        theme="system"
+        toastOptions={{
+          style: {
+            background: "var(--bg)",
+            color: "var(--fg)",
+            border: "1px solid var(--border-strong)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "13px",
+          },
+        }}
+      />
+      {process.env.NODE_ENV === "development" && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      )}
+    </>
+  )
+
+  if (!isLoaded) {
+    return <QueryClientProvider client={client}>{extras}</QueryClientProvider>
+  }
+
+  return (
+    <PersistQueryClientProvider
+      client={client}
+      persistOptions={{
+        persister,
+        maxAge: CACHE_MAX_AGE,
+        buster: userId ?? "anon",
+        // Only persist settled, successful results — never an error or a
+        // half-loaded cold-start attempt.
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) => query.state.status === "success",
+        },
+      }}
+    >
+      {extras}
+    </PersistQueryClientProvider>
+  )
+}
+
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
       appearance={{
@@ -51,29 +130,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <QueryClientProvider client={queryClient}>
-        {/* Syncs the PostHog person with the Clerk session (identify/reset). */}
-        <PostHogIdentify />
-        {/* Honors the OS "reduce motion" setting for all transform/layout
-            animations app-wide; value-based sweeps opt in via useReducedMotion. */}
-        <MotionConfig reducedMotion="user">{children}</MotionConfig>
-        <Toaster
-          position="bottom-right"
-          theme="system"
-          toastOptions={{
-            style: {
-              background: "var(--bg)",
-              color: "var(--fg)",
-              border: "1px solid var(--border-strong)",
-              fontFamily: "var(--font-sans)",
-              fontSize: "13px",
-            },
-          }}
-        />
-        {process.env.NODE_ENV === "development" && (
-          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
-        )}
-      </QueryClientProvider>
+      <AuthScopedQuery>{children}</AuthScopedQuery>
     </ClerkProvider>
   )
 }

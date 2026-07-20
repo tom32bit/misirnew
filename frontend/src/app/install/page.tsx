@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
+import { auth } from "@clerk/nextjs/server"
 import "@/components/landing/landing.css"
 
 export const metadata: Metadata = {
@@ -44,19 +45,32 @@ const STEPS = [
   },
 ]
 
-export default function InstallPage() {
+export default async function InstallPage() {
+  // The page is public (reachable signed-out from the landing nav), but a
+  // signed-in visitor arrives from the dashboard sidebar — so the nav has to
+  // reflect who's looking. Showing "Sign in" to someone already signed in, with
+  // no way back to the dashboard, was the bug.
+  const { userId } = await auth()
+  const signedIn = Boolean(userId)
+
   return (
     <div className="landing">
       <nav className="top">
         <div className="wrap nav-inner">
-          <Link href="/" className="wordmark">
+          <Link href={signedIn ? "/dashboard" : "/"} className="wordmark">
             <Image src="/landing/misir-logo.png" alt="" width={22} height={22} />
             Misir
           </Link>
           <div className="nav-links">
-            <Link href="/" className="quiet">Home</Link>
             <Link href="/privacy" className="quiet">Privacy</Link>
-            <Link href="/sign-in" className="btn btn-ghost sm">Sign in</Link>
+            {signedIn ? (
+              <Link href="/dashboard" className="btn btn-ghost sm">← Dashboard</Link>
+            ) : (
+              <>
+                <Link href="/" className="quiet">Home</Link>
+                <Link href="/sign-in" className="btn btn-ghost sm">Sign in</Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

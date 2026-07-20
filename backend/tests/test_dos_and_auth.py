@@ -49,12 +49,26 @@ def test_dos_middleware_and_limiter_configured():
     assert {"SlowAPIMiddleware", "BodySizeLimitMiddleware", "MetricsMiddleware"} <= names
 
 
-def test_api_docs_are_not_public_by_default():
+def test_api_docs_are_not_public_by_default(monkeypatch):
     """/docs, /redoc and openapi.json enumerate every route, parameter and model.
     They default to off so a deployment doesn't hand that out to anyone asking;
-    DOCS_ENABLED=true turns them back on locally."""
-    from fastapi.testclient import TestClient
+    DOCS_ENABLED=true turns them back on locally.
 
-    client = TestClient(main.app, raise_server_exceptions=False)
-    for path in ("/docs", "/redoc", "/api/v1/openapi.json"):
-        assert client.get(path).status_code == 404, f"{path} should not be served"
+    Force the default and rebuild the app in isolation rather than testing the
+    already-imported module app — otherwise a dev with DOCS_ENABLED=true in their
+    own .env fails a test that CI (no .env) passes."""
+    import importlib
+    from fastapi.testclient import TestClient
+    from core.config import get_settings
+
+    monkeypatch.setenv("DOCS_ENABLED", "false")
+    get_settings.cache_clear()
+    fresh_main = importlib.reload(main)
+    try:
+        client = TestClient(fresh_main.app, raise_server_exceptions=False)
+        for path in ("/docs", "/redoc", "/api/v1/openapi.json"):
+            assert client.get(path).status_code == 404, f"{path} should not be served"
+    finally:
+        # Restore the module app for any later test that imports `main`.
+        get_settings.cache_clear()
+        importlib.reload(main)

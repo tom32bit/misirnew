@@ -62,10 +62,18 @@ class Settings(BaseSettings):
 
     # Groq
     GROQ_API_KEY: str = ""
-    LLM_MODEL: str = "qwen/qwen3-32b"
+    # Must be a model the account can actually serve — an unavailable id 404s on
+    # EVERY call (synthesis, chat, nudges, space generation), and those failures
+    # are swallowed into fallbacks, so the app looks up while nothing AI works.
+    # `qwen/qwen3-32b` did exactly that. Verify with `client.models.list()`.
+    # llama-3.3-70b is non-reasoning: it returns valid JSON under the
+    # response_format=json_object path that space generation needs, which the
+    # available Qwen/gpt-oss reasoning models fail (their hidden reasoning eats
+    # the output and Groq returns json_validate_failed).
+    LLM_MODEL: str = "llama-3.3-70b-versatile"
     # Reasoning models (Qwen3) emit <think> chain-of-thought. "hidden" drops it
     # so responses stay clean; only sent to Qwen models (see GroqClient). Empty
-    # to disable (e.g. when reverting to a non-reasoning model like Llama).
+    # to disable (e.g. for a non-reasoning model like Llama, the current default).
     GROQ_REASONING_FORMAT: str = "hidden"
     LLM_MAX_TOKENS: int = 1024
     GROQ_TPM_LIMIT: int = 30000
