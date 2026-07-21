@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { cn } from "@/lib/utils"
@@ -24,17 +25,34 @@ export function SpaceTabNav() {
   const scope = params?.scope ?? "all"
   const view = params?.view ?? ""
 
+  // Keep the active tab in view when the row scrolls on mobile — set scrollLeft
+  // directly (not scrollIntoView, which would also scroll the page vertically).
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    const activeEl = scroller?.querySelector<HTMLElement>('[data-active="true"]')
+    if (!scroller || !activeEl) return
+    const target = activeEl.offsetLeft - (scroller.clientWidth - activeEl.clientWidth) / 2
+    scroller.scrollTo({ left: Math.max(0, target) })
+  }, [view, scope])
+
   if (scope === "all") return null
 
   return (
-    <div className="flex flex-none justify-center border-b border-border px-[18px] pb-3.5">
-      <div className="inline-flex gap-[3px] rounded-[12px] border border-border bg-bg-subtle p-[3px]">
+    // Centered on desktop; on phones the 5-tab track is wider than the screen,
+    // so left-align and let it scroll horizontally instead of clipping both ends.
+    <div
+      ref={scrollerRef}
+      className="flex flex-none justify-center overflow-x-auto border-b border-border px-[18px] pb-3.5 mobile:justify-start mobile:px-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="inline-flex flex-none gap-[3px] rounded-[12px] border border-border bg-bg-subtle p-[3px]">
         {TABS.map((tab) => {
           const active = view === tab.id
           return (
             <button
               key={tab.id}
               type="button"
+              data-active={active}
               onClick={() => router.push(`/dashboard/${scope}/${tab.id}`)}
               className={cn(
                 "relative rounded-[9px] px-3.5 py-[7px] text-[13px] font-medium transition-colors duration-150",
