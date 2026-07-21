@@ -10,7 +10,7 @@ export function ProConGrid({
   cons: string[]
 }) {
   return (
-    <div className="grid gap-3.5 mobile:grid-cols-1" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <div className="grid grid-cols-2 gap-3.5 mobile:grid-cols-1">
       <Column tone="success" title="Tailwinds for this path" items={pros} />
       <Column tone="danger" title="Headwinds against it" items={cons} />
     </div>

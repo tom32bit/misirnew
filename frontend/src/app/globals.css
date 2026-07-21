@@ -128,6 +128,11 @@
 /* Class-based dark mode */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* Phones (< md). The whole app-shell mobile layer — drawer sidebar, hamburger,
+   bottom nav, tightened padding, collapsed home grids — hangs off this variant.
+   Complements Tailwind's default min-width `md:` (≥768px). */
+@custom-variant mobile (@media (width < 768px));
+
 @theme {
   /* ── Fonts ──────────────────────────────────────────────────────────── */
   --font-sans:    "Styrene B LC", "Hanken Grotesk", system-ui, sans-serif;
@@ -228,6 +233,12 @@
   /* ── Easing ─────────────────────────────────────────────────────────── */
   --ease-out:    cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Layout ─────────────────────────────────────────────────────────────
+     Canonical max reading width for the dashboard content column. Powers
+     `max-w-view` (the shell's `mx-auto max-w-view` wrapper); v4 resolves
+     `max-w-<name>` from the --container-* namespace. */
+  --container-view: 1120px;
 }
 
 /* ── Semantic surface vars — switch with theme ────────────────────────── */

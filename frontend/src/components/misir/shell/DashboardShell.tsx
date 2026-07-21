@@ -57,7 +57,7 @@ export function DashboardShell({
         <SpaceTabNav />
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-7 pt-6 pb-16 mobile:px-3 mobile:pt-3 mobile:pb-[72px]"
+          className="flex-1 overflow-y-auto px-7 pt-6 pb-16 mobile:px-3 mobile:pt-3 mobile:pb-[calc(72px+env(safe-area-inset-bottom))]"
         >
           {/* Keyed on pathname so each view enters with a soft fade-rise.
               Search-param changes (period, date) deliberately don't re-key. */}

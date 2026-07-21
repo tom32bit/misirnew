@@ -44,15 +44,14 @@ export function KnowledgeGaps({
         Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className="grid items-start gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0"
-            style={{ gridTemplateColumns: "110px 1fr auto" }}
+            className="grid grid-cols-[110px_1fr_auto] items-start gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0 mobile:grid-cols-[72px_1fr]"
           >
             <Skeleton className="h-3 w-16" />
             <div className="flex flex-col gap-2">
               <Skeleton className="h-3.5 w-1/2" />
               <Skeleton className="h-3 w-3/4" />
             </div>
-            <Skeleton className="h-7 w-24 rounded-md" />
+            <Skeleton className="h-7 w-24 rounded-md mobile:hidden" />
           </div>
         ))}
 
@@ -71,8 +70,7 @@ export function KnowledgeGaps({
         return (
           <div
             key={g.id}
-            className="grid items-start gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0 mobile:grid-cols-[72px_1fr] mobile:gap-2.5"
-            style={{ gridTemplateColumns: "110px 1fr auto" }}
+            className="grid grid-cols-[110px_1fr_auto] items-start gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0 mobile:grid-cols-[72px_1fr] mobile:gap-2.5"
           >
             <span
               className={[

@@ -24,7 +24,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Navigation"
-      className="fixed bottom-0 left-0 right-0 z-[200] hidden h-[56px] border-t border-border bg-bg mobile:flex"
+      className="fixed bottom-0 left-0 right-0 z-[200] hidden min-h-14 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] mobile:flex"
     >
       {ITEMS.map((item) => {
         const active = view === item.id

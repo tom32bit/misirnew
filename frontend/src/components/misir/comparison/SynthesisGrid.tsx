@@ -39,10 +39,7 @@ export function SynthesisGrid({
         )}
       </CardHeader>
 
-      <div
-        className="grid mobile:grid-cols-1"
-        style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
-      >
+      <div className="grid grid-cols-3 mobile:grid-cols-1">
         <SynthesisCol
           icon="check"
           iconColor="var(--color-success)"

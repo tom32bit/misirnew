@@ -35,8 +35,7 @@ export function DecisionHero({
       </div>
 
       <div
-        className="mb-[18px] grid items-stretch gap-3.5 mobile:grid-cols-1"
-        style={{ gridTemplateColumns: "1fr auto 1fr" }}
+        className="mb-[18px] grid grid-cols-[1fr_auto_1fr] items-stretch gap-3.5 mobile:grid-cols-1"
       >
         <Option opt={optionA} primary />
         <div className="self-center rounded-full border border-border-strong bg-bg px-2.5 py-1 font-sans text-[11px] font-semibold text-fg-muted mobile:hidden">

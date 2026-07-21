@@ -88,8 +88,7 @@ export function Hero({
 
   return (
     <section
-      className="grid gap-8 rounded-panel border border-border bg-bg p-8 mobile:grid-cols-1 mobile:gap-5 mobile:p-4"
-      style={{ gridTemplateColumns: "minmax(0,1fr) 260px" }}
+      className="grid grid-cols-[minmax(0,1fr)_260px] gap-8 rounded-panel border border-border bg-bg p-8 mobile:grid-cols-1 mobile:gap-5 mobile:p-4"
     >
       <div className="min-w-0">
         <div className="mb-[18px] flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-fg-subtle">

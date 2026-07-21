@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Icon } from "@/components/misir/primitives/Icon"
 import { SectionHead } from "@/components/misir/primitives/Card"
 import { useSpaces } from "@/lib/hooks/useSpaces"
 import { useDashboard } from "@/lib/hooks/useDashboard"
@@ -118,8 +117,8 @@ export function ComparisonView({ scope }: { scope: Scope }) {
 
       {sources.length > 0 ? (
         <div
-          className="grid gap-3.5 mobile:grid-cols-1"
-          style={{ gridTemplateColumns: `repeat(${Math.min(3, sources.length)}, minmax(0, 1fr))` }}
+          className="grid gap-3.5 grid-cols-[repeat(var(--src-cols),minmax(0,1fr))] mobile:grid-cols-1"
+          style={{ ["--src-cols" as string]: String(Math.min(3, sources.length)) }}
         >
           {sources.map((s) => (
             <SourceCard key={s.key} source={s} color={s.color} />
@@ -127,10 +126,7 @@ export function ComparisonView({ scope }: { scope: Scope }) {
         </div>
       ) : dashboard.isLoading ? (
         // Source-card-shaped skeletons — same grid the real cards land in.
-        <div
-          className="grid gap-3.5 mobile:grid-cols-1"
-          style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
-        >
+        <div className="grid grid-cols-3 gap-3.5 mobile:grid-cols-1">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-3 rounded-panel border border-border bg-bg p-[18px]">
               <div className="flex items-center justify-between">
