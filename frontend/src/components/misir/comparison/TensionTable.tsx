@@ -52,10 +52,9 @@ export function TensionTable({
           {points.map((r, i) => (
             <div
               key={i}
-              className="grid items-center gap-3.5 border-b border-border py-2 last:border-b-0"
-              style={{ gridTemplateColumns: "24px 96px 1fr" }}
+              className="grid grid-cols-[24px_96px_1fr] items-center gap-3.5 border-b border-border py-2 last:border-b-0 mobile:grid-cols-1 mobile:items-start mobile:gap-0.5"
             >
-              <div className="font-sans text-[10px] text-fg-subtle">{r.num}</div>
+              <div className="font-sans text-[10px] uppercase tracking-[0.06em] text-fg-subtle">{r.num}</div>
               <div className="font-serif text-[13px] font-semibold text-fg">{r.from}</div>
               <div className="font-serif text-[13px] leading-[1.5] text-fg-muted">
                 {r.stance}

@@ -50,7 +50,7 @@ function SectionHead({
   className?: string
 }) {
   return (
-    <div className={cn("flex items-center justify-between gap-3 px-0.5 pt-1.5", className)}>
+    <div className={cn("flex items-center justify-between gap-3 px-0.5 pt-1.5 mobile:flex-col mobile:items-start mobile:gap-1", className)}>
       <div className="flex min-w-0 items-center gap-2 text-[14px] font-medium text-fg">
         {icon ? (
           <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md border border-border bg-bg-subtle text-fg-muted">
