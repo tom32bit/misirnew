@@ -16,7 +16,6 @@ export function FilterBar({
     <div
       className={cn(
         "flex flex-wrap items-center gap-2 border-b border-border bg-bg-subtle px-4 py-2.5",
-        "mobile:flex-nowrap mobile:overflow-x-auto",
         className,
       )}
       {...rest}
@@ -67,7 +66,7 @@ export function Segmented<T extends string>({
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "h-[26px] px-2.5 text-[11.5px] transition-colors",
+              "h-[26px] flex-none whitespace-nowrap px-2.5 text-[11.5px] transition-colors",
               i > 0 && "border-l border-border",
               active
                 ? "bg-bg-muted font-medium text-fg"

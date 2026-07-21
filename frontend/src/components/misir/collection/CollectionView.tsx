@@ -197,7 +197,15 @@ export function CollectionView({ scope }: { scope: Scope }) {
 
       <Card className="p-0 overflow-hidden">
         <FilterBar>
-          <Segmented value={typeFilter} onChange={setTypeFilter} options={segOpts} />
+          {/* Type tabs are the primary filter; on phones they scroll on their
+              own full-width row (scrollbar hidden) instead of pushing the
+              search/selects off-screen. */}
+          <Segmented
+            value={typeFilter}
+            onChange={setTypeFilter}
+            options={segOpts}
+            className="mobile:max-w-full mobile:overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          />
 
           {isAll && spaces.length > 0 && (
             <select
@@ -244,7 +252,7 @@ export function CollectionView({ scope }: { scope: Scope }) {
             placeholder="Search title, marker, source…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-8 min-w-[200px] rounded-lg border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none transition-colors placeholder:text-fg-faint focus:border-[var(--color-accent)]"
+            className="h-8 min-w-[200px] rounded-lg border border-border bg-bg px-2.5 text-[12.5px] text-fg outline-none transition-colors placeholder:text-fg-faint focus:border-[var(--color-accent)] mobile:min-w-0 mobile:flex-1"
           />
           <FilterCount>
             {filtered.length} of {captures.length}
