@@ -303,16 +303,15 @@ export function CollectionView({ scope }: { scope: Scope }) {
 function CaptureRowSkeleton() {
   return (
     <div
-      className="grid items-center gap-3.5 border-b border-border px-4 py-2.5 mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
-      style={{ gridTemplateColumns: "60px 110px 1fr auto" }}
+      className="grid grid-cols-[60px_110px_1fr_auto] items-center gap-3.5 border-b border-border px-4 py-2.5 mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
     >
-      <Skeleton className="h-3 w-10" />
+      <Skeleton className="h-3 w-10 mobile:col-start-1 mobile:row-start-1" />
       <Skeleton className="h-3 w-20 mobile:hidden" />
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mobile:col-start-2 mobile:col-span-2 mobile:row-start-1">
         <Skeleton className="h-5 w-14 rounded-full" />
         <Skeleton className="h-3 w-44" />
       </div>
-      <Skeleton className="h-5 w-16 rounded-full" />
+      <Skeleton className="h-5 w-16 rounded-full mobile:col-start-1 mobile:col-span-2 mobile:row-start-2" />
     </div>
   )
 }
@@ -378,17 +377,16 @@ function CaptureRow({
 
   return (
     <div
-      className="group grid items-center gap-3.5 border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
-      style={{ gridTemplateColumns: "60px 110px 1fr auto auto" }}
+      className="group grid grid-cols-[60px_110px_1fr_auto_auto] items-center gap-3.5 border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[44px_1fr_auto] mobile:gap-2"
     >
-      <div className="whitespace-nowrap font-sans text-[11px] tabular-nums text-fg-subtle">
+      <div className="whitespace-nowrap font-sans text-[11px] tabular-nums text-fg-subtle mobile:col-start-1 mobile:row-start-1">
         {capture.time}
       </div>
       <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap font-sans text-[11px] text-fg-muted mobile:hidden">
         <Icon name={capture.surfaceIcon} size={12} />
         {capture.surface}
       </div>
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2 mobile:col-start-2 mobile:col-span-2 mobile:row-start-1">
         <Chip variant="type">{capture.type.toLowerCase()}</Chip>
         <span className="min-w-0 flex-1 truncate text-[13px] text-fg">
           {capture.title}
@@ -397,7 +395,7 @@ function CaptureRow({
           <Chip variant="revisit">×{capture.revisit} revisited</Chip>
         )}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 mobile:col-start-1 mobile:col-span-2 mobile:row-start-2">
         {capture.marker && <Chip variant="marker">{capture.marker}</Chip>}
         {subspace && (
           <SubspaceTag color={subspaceColor}>{subspace.name}</SubspaceTag>
@@ -406,11 +404,13 @@ function CaptureRow({
           <SpaceTag color={spaceColor}>{space.name}</SpaceTag>
         )}
       </div>
-      <div className="flex items-center gap-1">
-        {/* No confirm step — deletion is optimistic and undoable via toast. */}
+      <div className="flex items-center gap-1 mobile:col-start-3 mobile:row-start-2">
+        {/* No confirm step — deletion is optimistic and undoable via toast.
+            opacity-0/group-hover is a desktop-only affordance — there's no
+            hover on touch, so the button stays visible on mobile instead. */}
         <button
           onClick={() => onDelete(capture.id)}
-          className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint transition-opacity hover:text-[var(--color-danger)]"
+          className="opacity-0 group-hover:opacity-100 rounded p-1 text-fg-faint transition-opacity hover:text-[var(--color-danger)] mobile:opacity-100"
           aria-label="Delete capture"
         >
           <Icon name="trash-2" size={13} />

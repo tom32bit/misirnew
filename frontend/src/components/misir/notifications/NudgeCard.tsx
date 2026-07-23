@@ -66,9 +66,8 @@ export function NudgeCard({
     <div
       role="region"
       aria-label="Misir noticed"
-      className="relative grid items-center gap-[18px] rounded-panel border bg-[color-mix(in_srgb,var(--sc,var(--accent))_4%,var(--bg))] py-3.5 pl-[22px] pr-[18px] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:rounded-l-panel before:bg-[var(--sc,var(--accent))] mobile:grid-cols-1"
+      className="relative grid grid-cols-[1fr_auto] items-center gap-[18px] rounded-panel border bg-[color-mix(in_srgb,var(--sc,var(--accent))_4%,var(--bg))] py-3.5 pl-[22px] pr-[18px] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:rounded-l-panel before:bg-[var(--sc,var(--accent))] mobile:grid-cols-1"
       style={{
-        gridTemplateColumns: "1fr auto",
         ["--sc" as string]: color,
         borderColor: `color-mix(in srgb, ${color} 25%, transparent)`,
       }}

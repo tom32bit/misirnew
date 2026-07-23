@@ -300,8 +300,7 @@ function NotificationRow({
 
   return (
     <div
-      className="grid items-start gap-4 border-b border-border px-[18px] py-3.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[72px_1fr] mobile:gap-2.5"
-      style={{ gridTemplateColumns: "100px 1fr auto" }}
+      className="grid grid-cols-[100px_1fr_auto] items-start gap-4 border-b border-border px-[18px] py-3.5 last:border-b-0 hover:bg-bg-muted mobile:grid-cols-[72px_1fr] mobile:gap-2.5"
     >
       <span
         className={["inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em]", sevClass].join(" ")}
@@ -322,7 +321,9 @@ function NotificationRow({
         )}
       </div>
 
-      <div className="flex flex-col items-end gap-2 mobile:hidden">
+      {/* Own row on mobile (spans both columns) rather than hidden — the CTA
+          is how you act on a notification, so it stays reachable on phones. */}
+      <div className="flex flex-col items-end gap-2 mobile:col-span-2 mobile:row-start-2 mobile:flex-row mobile:items-center mobile:justify-between mobile:pt-0.5">
         <span className="whitespace-nowrap font-mono text-[10.5px] text-fg-subtle">
           {row.at}
         </span>
