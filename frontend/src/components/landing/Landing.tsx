@@ -14,6 +14,7 @@ import "./landing.css"
 export function Landing() {
   const [menuOpen, setMenuOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Reveal sections once as they scroll in. Reduced-motion (or no IO support)
   // shows everything immediately rather than leaving it invisible.
@@ -39,6 +40,44 @@ export function Landing() {
       { threshold: 0.15 },
     )
     targets.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
+  // The closing video is a 2.4MB download that was fetching eagerly on every
+  // landing load despite sitting at the very bottom of the page — most
+  // visitors never scroll that far. Deferred to a `data-src` swap once it's
+  // near the viewport (separate observer from the reveal one above: this
+  // drives a network fetch, not just a CSS class). `rootMargin` starts it
+  // slightly early so playback is ready by the time it's actually visible.
+  useEffect(() => {
+    const el = videoRef.current
+    const src = el?.dataset.src
+    if (!el || !src) return
+
+    const start = () => {
+      el.src = src
+      el.load()
+      // HTMLMediaElement.play() returns a Promise per spec, but jsdom (the
+      // test environment) doesn't implement media playback and returns
+      // undefined instead — guard rather than assume a real browser.
+      const playing = el.play()
+      if (playing && typeof playing.catch === "function") playing.catch(() => {})
+    }
+
+    if (!("IntersectionObserver" in window)) {
+      start()
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          start()
+          io.disconnect()
+        }
+      },
+      { rootMargin: "200px" },
+    )
+    io.observe(el)
     return () => io.disconnect()
   }, [])
 
@@ -349,8 +388,9 @@ export function Landing() {
           </div>
           <figure className="final-media">
             <video
-              src="/landing/end_hero.webm"
-              autoPlay
+              ref={videoRef}
+              data-src="/landing/end_hero.webm"
+              preload="none"
               loop
               muted
               playsInline
