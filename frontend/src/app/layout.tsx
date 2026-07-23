@@ -4,10 +4,19 @@ import { Providers } from "./providers"
 import { ConsentBanner } from "@/components/privacy/ConsentBanner"
 import "./globals.css"
 
+// www.misir.app is canonical — the bare apex 308s to it (see next.config.ts /
+// Vercel domain setup) — so absolute OG/Twitter image URLs resolve off this.
+const SITE_URL = "https://www.misir.app"
+const SITE_DESCRIPTION =
+  "Decision-readiness for founders and operators. Tracks your sources and tells you when you're ready to decide."
+
 export const metadata: Metadata = {
-  title: "Misir",
-  description:
-    "Decision-readiness for founders and operators. Tracks your sources and tells you when you're ready to decide.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Misir",
+    template: "%s · Misir",
+  },
+  description: SITE_DESCRIPTION,
   // Icons live in public/ and are declared here rather than using the
   // app/icon.* file convention, which serves them from extensionless URLs
   // (/icon?<hash>, /apple-icon?<hash>). proxy.ts only exempts static assets by
@@ -23,6 +32,31 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   manifest: "/site.webmanifest",
+  // Default social card — the marketing surface signed-out visitors reach and
+  // the one link people actually share to invite others into the beta.
+  // Auth-gated routes (dashboard, sign-in/up) override this with noindex
+  // rather than a card, since there's nothing shareable behind them.
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "Misir",
+    title: "Misir — Turn scattered reading into decisions you can defend",
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/landing/hero-image.png",
+        width: 2816,
+        height: 1536,
+        alt: "Illustration of AI assistants, websites and notes unpacked from a cardboard box.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Misir — Turn scattered reading into decisions you can defend",
+    description: SITE_DESCRIPTION,
+    images: ["/landing/hero-image.png"],
+  },
 }
 
 // Runs before paint to set the theme with no flash. Reads the versioned key

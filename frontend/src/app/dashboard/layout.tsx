@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { serverApi } from "@/lib/api/server"
 import { spacesApi } from "@/lib/api/spaces"
 import type { Space } from "@/lib/api/types"
@@ -5,6 +6,9 @@ import { DashboardShell } from "@/components/misir/shell/DashboardShell"
 
 // Dashboard is auth-gated and reads search params client-side; never prerender.
 export const dynamic = "force-dynamic"
+// Private, per-user data — never indexable, and it would otherwise inherit
+// the landing's OG card since no page under here sets its own metadata.
+export const metadata: Metadata = { robots: { index: false, follow: false } }
 
 export default async function DashboardLayout({
   children,

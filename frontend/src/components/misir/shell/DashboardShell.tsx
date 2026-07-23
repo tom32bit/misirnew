@@ -36,6 +36,15 @@ export function DashboardShell({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
+      {/* Visually hidden until focused — first Tab stop, jumps keyboard users
+          past the sidebar straight to the content that changes per route. */}
+      <a
+        href="#dashboard-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-400 focus:rounded-md focus:bg-bg focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:text-fg focus:shadow-(--shadow-popover)"
+      >
+        Skip to content
+      </a>
+
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -55,9 +64,13 @@ export function DashboardShell({
       <div className="flex h-screen flex-1 flex-col overflow-hidden">
         <Topbar />
         <SpaceTabNav />
-        <div
+        <main
+          id="dashboard-main"
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-7 pt-6 pb-16 mobile:px-3 mobile:pt-3 mobile:pb-[calc(72px+env(safe-area-inset-bottom))]"
+          // tabIndex={-1}: focusable via the skip link's #hash jump without
+          // joining the normal Tab order.
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto px-7 pt-6 pb-16 outline-none mobile:px-3 mobile:pt-3 mobile:pb-[calc(72px+env(safe-area-inset-bottom))]"
         >
           {/* Keyed on pathname so each view enters with a soft fade-rise.
               Search-param changes (period, date) deliberately don't re-key. */}
@@ -70,7 +83,7 @@ export function DashboardShell({
           >
             {children}
           </motion.div>
-        </div>
+        </main>
       </div>
 
       <MobileNav />

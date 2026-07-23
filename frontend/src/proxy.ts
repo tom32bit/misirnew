@@ -15,6 +15,12 @@ const isPublic = createRouteMatcher([
   "/api/webhooks(.*)",
   "/privacy(.*)",
   "/terms(.*)",
+  // Crawlers never authenticate, so these must stay reachable — otherwise
+  // every search engine gets bounced to /sign-in instead of the real file.
+  // Not covered by the matcher's extension exclusions below since .xml/.txt
+  // aren't in that list (by design — see the comment on `config.matcher`).
+  "/sitemap.xml",
+  "/robots.txt",
   // PostHog reverse proxy (see rewrites in next.config.ts). Analytics ingestion
   // must never be auth-gated — a signed-out landing-page visitor generates
   // pageview/autocapture events too, and auth.protect() would 307 them to
