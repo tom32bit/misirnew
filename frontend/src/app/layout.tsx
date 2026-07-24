@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import Script from "next/script"
-import { Providers } from "./providers"
 import { ConsentBanner } from "@/components/privacy/ConsentBanner"
 import "./globals.css"
 
@@ -83,10 +82,12 @@ export default function RootLayout({
         </Script>
       </head>
       <body>
-        <Providers>
-          {children}
-          <ConsentBanner />
-        </Providers>
+        {/* Clerk/TanStack Query/Toaster live in (app)/layout.tsx, not here —
+            the marketing route group (/, /install, /privacy) calls no API
+            and needs no auth, so it no longer pays for that JS. See
+            (app)/layout.tsx for what moved and why. */}
+        {children}
+        <ConsentBanner />
       </body>
     </html>
   )
