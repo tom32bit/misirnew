@@ -6,7 +6,15 @@ export const DEFAULT_BLOCKLIST: string[] = [
   // Search engines (result pages, not article content). Does NOT include
   // AI-answer engines like Perplexity — those are supported capture surfaces
   // (see host_permissions in manifest.json), not blocked.
-  'google.com',
+  //
+  // 'www.google.com' specifically, NOT bare 'google.com': isHostBlocked treats
+  // an entry as "this host AND every subdomain" (suffix match), and a bare
+  // google.com entry was silently blocking gemini.google.com and
+  // notebooklm.google.com too — both declared, supported capture surfaces in
+  // manifest.json — plus docs/drive/scholar.google.com, which have genuine
+  // capturable content. Same reasoning applies to any other multi-product
+  // domain: prefer the specific subdomain over the bare root.
+  'www.google.com',
   'bing.com',
   'duckduckgo.com',
   'search.yahoo.com',
@@ -20,6 +28,12 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'search.aol.com',
   'so.com',
   'sogou.com',
+  'seznam.cz',
+  'mojeek.com',
+  'swisscows.com',
+  'search.naver.com',
+  'search.daum.net',
+  'metager.org',
   // Email — dedicated webmail hosts only, not a provider's whole domain
   // (e.g. not gmx.com/icloud.com, which mix mail with other apps/marketing).
   'mail.google.com',
@@ -30,9 +44,14 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'mail.yandex.com',
   'mail.zoho.com',
   'mail.aol.com',
+  'mail.qq.com',
+  'mail.163.com',
+  'mail.126.com',
+  'e.mail.ru',
   // Auth / account / SSO
   'accounts.google.com',
   'myaccount.google.com',
+  'admin.google.com',
   'login.microsoftonline.com',
   'login.live.com',
   'appleid.apple.com',
@@ -41,6 +60,7 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'signin.aws.amazon.com',
   'secure.login.gov',
   'login.salesforce.com',
+  'app.salesforce.com',
   // Social / feeds — not Reddit or Quora, which host genuine long-form
   // reading/discussion content people research with, not just a feed.
   'twitter.com',
@@ -54,6 +74,13 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'snapchat.com',
   'nextdoor.com',
   'bsky.app',
+  'vk.com',
+  'weibo.com',
+  'douyin.com',
+  'truthsocial.com',
+  'gettr.com',
+  'gab.com',
+  'parler.com',
   // Chat / messaging apps (conversation UI, not readable/capturable content)
   'web.whatsapp.com',
   'web.telegram.org',
@@ -63,6 +90,10 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'discord.com',
   'discordapp.com',
   'app.element.io',
+  'web.wechat.com',
+  'web.kakao.com',
+  'web.groupme.com',
+  'voice.google.com',
   // Video meetings (participant lists / UI, never capturable content)
   'meet.google.com',
   'zoom.us',
@@ -74,15 +105,34 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'meet.jit.si',
   'meet.zoho.com',
   'gotomeeting.com',
+  'gotowebinar.com',
   'bluejeans.com',
   'chime.aws',
   'web.skype.com',
+  'app.ringcentral.com',
+  'vonage.com',
   // Banking / payments / crypto — secure transactional dashboards, not
   // reading content. Necessarily a representative set, not exhaustive.
   'chase.com',
   'bankofamerica.com',
   'wellsfargo.com',
   'citibank.com',
+  'usbank.com',
+  'pnc.com',
+  'capitalone.com',
+  'discover.com',
+  'americanexpress.com',
+  'td.com',
+  'ally.com',
+  'etrade.com',
+  'merrilledge.com',
+  'interactivebrokers.com',
+  'webull.com',
+  'hsbc.com',
+  'barclays.co.uk',
+  'lloydsbank.com',
+  'natwest.com',
+  'santander.com',
   'paypal.com',
   'venmo.com',
   'binance.com',
@@ -92,6 +142,12 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'fidelity.com',
   'schwab.com',
   'vanguard.com',
+  'gemini.com',
+  'bitfinex.com',
+  'bybit.com',
+  'okx.com',
+  'kucoin.com',
+  'crypto.com',
   // Password managers / 2FA vaults
   'bitwarden.com',
   'vault.bitwarden.com',
@@ -100,6 +156,8 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'dashlane.com',
   'keepersecurity.com',
   'authy.com',
+  'roboform.com',
+  'nordpass.com',
   // Cloud / admin / SaaS dashboards — the specific app subdomain only, not
   // a vendor's whole domain (e.g. not stripe.com or aws.amazon.com, which
   // have real docs/marketing content worth capturing).
@@ -108,6 +166,7 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'console.aws.amazon.com',
   'portal.azure.com',
   'console.cloud.google.com',
+  'console.firebase.google.com',
   'dashboard.stripe.com',
   'app.datadoghq.com',
   'admin.shopify.com',
@@ -118,11 +177,25 @@ export const DEFAULT_BLOCKLIST: string[] = [
   'app.mixpanel.com',
   'app.amplitude.com',
   'app.intercom.com',
+  'app.zendesk.com',
+  'app.pipedrive.com',
+  'app.close.com',
   'www.semrush.com',
   'app.semrush.com',
   'www.canva.com',
   'trello.com',
   'app.asana.com',
+  'app.clickup.com',
+  // HR / payroll / benefits portals — account + paystub dashboards, not
+  // reading content.
+  'workday.com',
+  'workforcenow.adp.com',
+  'gusto.com',
+  'bamboohr.com',
+  'paycom.com',
+  'paylocity.com',
+  'justworks.com',
+  'rippling.com',
   // Misir app itself
   'localhost',
   'misir.app',
